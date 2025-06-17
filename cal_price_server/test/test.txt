@@ -1,0 +1,10 @@
+curl -X POST "localhost:8088/cal_prize/classify/classify_list" -H "Content-Type: application/json" -d '{}'
+
+
+curl -X POST "localhost:8088/cal_prize/pricing_rule/min_pricing" -H "Content-Type: application/json" -d \
+'{
+  "category_id": 8,
+  "weight": 500,
+  "volume": 0.3,
+  "extra_fee": 20
+}'
