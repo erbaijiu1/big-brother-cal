@@ -2,3 +2,10 @@ uniapp-cal-price/node_modules/*
 uniapp-cal-price/node_modules/
 uniapp-cal-price/dist/
 uniapp-cal-price/dist
+cal_price_server/.idea/
+cal_price_server/__pycache__/
+.gitignore
+cal_price_server/db/__pycache__/
+cal_price_server/logs
+cal_price_server/api/__pycache__
+cal_price_server/server_mgr/__pycache__
