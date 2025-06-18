@@ -26,13 +26,13 @@
       <input v-model="addressTo" placeholder="目的地" class="input" />
     </view>
 
-    <view class="form-item">
+    <!-- <view class="form-item">
       <text class="label">货物类型</text>
       <radio-group class="radio-group" v-model="packageType">
         <label class="radio-label"><radio value="袋装" class="mini-radio" /> 袋装</label>
         <label class="radio-label"><radio value="整托" class="mini-radio" /> 整托</label>
       </radio-group>
-    </view>
+    </view> -->
 
     <view class="form-item">
       <text class="label">是否电梯</text>

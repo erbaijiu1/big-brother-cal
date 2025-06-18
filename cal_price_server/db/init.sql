@@ -193,3 +193,46 @@ INSERT INTO t_pricing_rule (
     '[{"range": "0-99999999", "unit_price": 2.0, "prize_type": "KG"}, {"range": "0-99999999", "unit_price": 400, "prize_type": "CBM"}]',
     '', '', '', '', '', '0', '', 1
 );
+
+
+-- 普C
+INSERT INTO t_pricing_rule (
+    category_id, channel, transport_method, warehouse, min_consumption,
+    unit_price_rules, discount_price, surcharge_fee_rules, delivery_fee_rules,
+    delivery_time, packaging_requirement, remark, compensation_policy, status
+) VALUES (
+    9, '普C', '陆运', '深圳/东莞仓', '80',
+    '[{"range": "0-99999999", "unit_price": 0.5, "prize_type": "KG"}, {"range": "0-99999999", "unit_price": 100, "prize_type": "CBM"}]',
+    '', '', '', '', '', '普货最低消费80元/票', '', 1
+);
+
+INSERT INTO t_pricing_rule (
+    category_id, channel, transport_method, warehouse, min_consumption,
+    unit_price_rules, discount_price, surcharge_fee_rules, delivery_fee_rules,
+    delivery_time, packaging_requirement, remark, compensation_policy, status
+) VALUES (
+    9, '普C', '陆运', '广州仓', '80',
+    '[{"range": "0-99999999", "unit_price": 2, "prize_type": "KG"}, {"range": "0-99999999", "unit_price": 350, "prize_type": "CBM"}]',
+    '', '', '', '', '', '普货最低消费80元/票', '', 1
+);
+
+INSERT INTO t_pricing_rule (
+    category_id, channel, transport_method, warehouse, min_consumption,
+    unit_price_rules, discount_price, surcharge_fee_rules, delivery_fee_rules,
+    delivery_time, packaging_requirement, remark, compensation_policy, status
+) VALUES (
+    8, '普C', '陆运', '深圳/东莞仓', '80',
+    '[{"range": "0-99999999", "unit_price": 0.6, "prize_type": "KG"}, {"range": "0-99999999", "unit_price": 125, "prize_type": "CBM"}]',
+    '', '', '', '', '', '家私或其他最低消费80元/票', '', 1
+);
+
+
+INSERT INTO t_pricing_rule (
+    category_id, channel, transport_method, warehouse, min_consumption,
+    unit_price_rules, discount_price, surcharge_fee_rules, delivery_fee_rules,
+    delivery_time, packaging_requirement, remark, compensation_policy, status
+) VALUES (
+    4, '普C', '陆运', '深圳/东莞仓', '80',
+    '[{"range": "0-99999999", "unit_price": 1.2, "prize_type": "KG"}, {"range": "0-99999999", "unit_price": 220, "prize_type": "CBM"}]',
+    '', '', '', '', '', '食品最低消费80元/票', '', 1
+);
