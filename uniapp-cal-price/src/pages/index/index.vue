@@ -21,10 +21,31 @@
       <input type="number" v-model="volume" placeholder="请输入体积" class="input" />
     </view>
 
-    <view class="form-item">
+    <view class="form-item address-row">
+      <text class="label">地址</text>
+      <view class="address-select-wrap">
+        <!-- 大区选择 -->
+        <picker :range="districts" range-key="district_cn" @change="onDistrictChange">
+          <view class="select-box">
+            {{ selectedDistrictName || '请选择大区' }}
+          </view>
+        </picker>
+        <!-- 小区选择 -->
+        <picker :range="subDistricts" range-key="sub_cn" @change="onSubDistrictChange" :disabled="!selectedDistrict">
+          <view class="select-box">
+            {{ selectedSubDistrictName || '请选择小区' }}
+          </view>
+        </picker>
+      </view>
+      <view v-if="isRemote !== null" class="remote-tip" :class="{ remote: isRemote }">
+        {{ isRemote ? '该地区为偏远地区' : '该地区非偏远' }}
+      </view>
+    </view>
+
+    <!-- <view class="form-item">
       <text class="label">地址</text>
       <input v-model="addressTo" placeholder="目的地" class="input" />
-    </view>
+    </view> -->
 
     <!-- <view class="form-item">
       <text class="label">货物类型</text>
@@ -37,16 +58,24 @@
     <view class="form-item">
       <text class="label">是否电梯</text>
       <radio-group class="radio-group" v-model="hasElevator">
-        <label class="radio-label"><radio value="是" class="mini-radio" /> 有</label>
-        <label class="radio-label"><radio value="否" class="mini-radio" /> 无</label>
+        <label class="radio-label">
+          <radio value="是" class="mini-radio" /> 有
+        </label>
+        <label class="radio-label">
+          <radio value="否" class="mini-radio" /> 无
+        </label>
       </radio-group>
     </view>
 
     <view class="form-item">
       <text class="label">是否搬楼</text>
       <radio-group class="radio-group" v-model="needStairs">
-        <label class="radio-label"><radio value="是" class="mini-radio" /> 是</label>
-        <label class="radio-label"><radio value="否" class="mini-radio" /> 否</label>
+        <label class="radio-label">
+          <radio value="是" class="mini-radio" /> 是
+        </label>
+        <label class="radio-label">
+          <radio value="否" class="mini-radio" /> 否
+        </label>
       </radio-group>
     </view>
 
@@ -56,7 +85,12 @@
       <view class="popup">
         <text class="popup-title">报价结果</text>
         <view v-for="(item, index) in resultList" :key="index" class="quote-item">
-          <text>方案 {{ index + 1 }}：<text class="price">{{ item.price }}</text> 元，预计 {{ item.eta }}</text>
+          <text>
+            方案{{ index + 1 }}：<text class="price">{{ item.total_price }}</text> 元，
+            渠道：{{ item.channel }}，
+            运输：{{ item.transport_method }}，
+            仓库：{{ item.warehouse }}
+          </text>
         </view>
         <button class="popup-button" @click="contactCustomer">联系客服领优惠</button>
       </view>
@@ -66,6 +100,7 @@
 
 <script>
 import { BASE_URL } from '@/common/config'
+import hkDistricts from '@/common/hk_districts.json'
 
 export default {
   data() {
@@ -82,6 +117,13 @@ export default {
       hasElevator: '是',
       needStairs: '否',
       resultList: []
+      , districts: hkDistricts,        // 大区json
+      subDistricts: [],     // 当前选中的大区下的小区列表
+      selectedDistrict: null,
+      selectedDistrictName: '',
+      selectedSubDistrict: null,
+      selectedSubDistrictName: '',
+      isRemote: null,       // 是否偏远
     };
   },
   onLoad() {
@@ -112,21 +154,34 @@ export default {
       this.selectedCategorySub = selected.sub;
     },
     submit() {
+      // 校验
+      if (!this.selectedCategory) {
+        uni.showToast({ title: '请选择分类', icon: 'none' });
+        return;
+      }
+      if (!this.weight || !this.volume) {
+        uni.showToast({ title: '请填写重量和体积', icon: 'none' });
+        return;
+      }
       uni.request({
-        url: `${BASE_URL}/get-pricing`,
+        url: `${BASE_URL}/cal_prize/pricing_rule/min_pricing`,
         method: 'POST',
         data: {
-          category: this.selectedCategory,
-          weight: this.weight,
-          volume: this.volume,
-          from_address: this.addressFrom,
-          to_address: this.addressTo,
-          type: this.packageType,
-          has_elevator: this.hasElevator,
-          need_stairs: this.needStairs
+          category_id: Number(this.selectedCategory), // 保证数字类型
+          weight: Number(this.weight),
+          volume: Number(this.volume),
+          extra_fee_data: {
+            to_address: this.addressTo,
+            type: this.packageType,
+            has_elevator: this.hasElevator,
+            need_stairs: this.needStairs,
+            district: this.selectedDistrict,
+            sub_district: this.selectedSubDistrict,
+            is_remote: this.isRemote,
+          }
         },
         success: (res) => {
-          this.resultList = res.data;
+          this.resultList = (res.data && res.data.data) ? res.data.data : [];
           this.$refs.resultPopup.open();
         }
       });
@@ -136,6 +191,23 @@ export default {
         url: '/pages/contact/index'
       });
     }
+    , onDistrictChange(e) {
+      const idx = e.detail.value;
+      const district = this.districts[idx];
+      this.selectedDistrict = district.district_cn;
+      this.selectedDistrictName = district.district_cn;
+      this.subDistricts = district.sub_districts;
+      this.selectedSubDistrict = null;
+      this.selectedSubDistrictName = '';
+      this.isRemote = null;
+    },
+    onSubDistrictChange(e) {
+      const idx = e.detail.value;
+      const sub = this.subDistricts[idx];
+      this.selectedSubDistrict = sub.sub_cn;
+      this.selectedSubDistrictName = sub.sub_cn;
+      this.isRemote = sub.remote;
+    },
   }
 };
 </script>
@@ -240,4 +312,33 @@ export default {
   width: 100%;
   box-sizing: border-box;
 }
+
+.address-row .address-select-wrap {
+  display: flex;
+  flex-direction: row;
+  gap: 18rpx;
+  margin-top: 8rpx;
+}
+.address-row .select-box {
+  flex: 1 1 0;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 12rpx;
+  padding: 16rpx 16rpx;
+  min-height: 56rpx;
+  font-size: 28rpx;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+.remote-tip {
+  margin-top: 6rpx;
+  color: #999;
+  font-size: 24rpx;
+}
+.remote-tip.remote {
+  color: #ff9800;
+  font-weight: bold;
+}
+
 </style>

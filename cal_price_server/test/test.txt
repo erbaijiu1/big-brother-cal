@@ -8,3 +8,20 @@ curl -X POST "localhost:8088/cal_prize/pricing_rule/min_pricing" -H "Content-Typ
   "volume": 0.3,
   "extra_fee": 20
 }'
+
+curl -X POST "localhost:8088/cal_prize/pricing_rule/min_pricing" -H "Content-Type: application/json" -d \
+'{
+  "category_id": 9,
+  "weight": "3",
+  "volume": "0.2",
+  "extra_fee_data": {
+    "to_address": "",
+    "type": "袋装",
+    "has_elevator": "是",
+    "need_stairs": "否",
+    "district": "油尖旺区",
+    "sub_district": "尖沙咀",
+    "is_remote": false
+  }
+}'
+
