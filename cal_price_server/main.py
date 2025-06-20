@@ -8,8 +8,8 @@ import logging
 
 app = FastAPI()
 
-app.include_router(classify_router, prefix="/cal_prize/classify")
-app.include_router(pricing_rule_router, prefix="/cal_prize/pricing_rule")
+app.include_router(classify_router, prefix="/cal_price/classify")
+app.include_router(pricing_rule_router, prefix="/cal_price/pricing_rule")
 
 app.add_middleware(
     CORSMiddleware,

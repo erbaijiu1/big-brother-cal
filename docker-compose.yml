@@ -1,0 +1,42 @@
+version: '3.9'
+
+services:
+  cal_price_server:
+    build:
+      context: ./cal_price_server
+    container_name: cal_price_server
+    restart: always
+    expose:
+      - 8088
+    env_file:
+      - ./cal_price_server/docker_conf.env
+    depends_on:
+      - mysql
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro      # 路径已变化
+      - ./dist:/usr/share/nginx/html:ro
+      - ./logs:/var/log/nginx                            # 日志挂载到本地 logs 目录
+    depends_on:
+      - cal_price_server
+    ports:
+      - "80:80"
+
+  mysql:
+    image: mysql:8.4
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: Gmcc@123 
+      MYSQL_DATABASE: db_prize_cal
+      MYSQL_USER: root
+      MYSQL_PASSWORD: Gmcc@123 
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - ../server_data/mysql:/var/lib/mysql
+

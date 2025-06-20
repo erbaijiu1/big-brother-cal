@@ -132,7 +132,7 @@ export default {
   methods: {
     loadCategories() {
       uni.request({
-        url: `${BASE_URL}/cal_prize/classify/classify_list`,
+        url: `${BASE_URL}/cal_price/classify/classify_list`,
         method: 'POST',
         data: {},
         success: (res) => {
@@ -164,7 +164,7 @@ export default {
         return;
       }
       uni.request({
-        url: `${BASE_URL}/cal_prize/pricing_rule/min_pricing`,
+        url: `${BASE_URL}/cal_price/pricing_rule/min_pricing`,
         method: 'POST',
         data: {
           category_id: Number(this.selectedCategory), // 保证数字类型
