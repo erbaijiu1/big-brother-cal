@@ -3,14 +3,16 @@
     "district_cn": "中西區",
     "district_en": "Central and Western",
     "sub_districts": [
-      {"sub_cn": "堅尼地城", "sub_en": "Kennedy Town", "remote": false},
-      {"sub_cn": "石塘咀", "sub_en": "Shek Tong Tsui", "remote": false},
-      {"sub_cn": "西營盤", "sub_en": "Sai Ying Pun", "remote": false},
-      {"sub_cn": "上環", "sub_en": "Sheung Wan", "remote": false},
-      {"sub_cn": "中環", "sub_en": "Central", "remote": false},
-      {"sub_cn": "金鐘", "sub_en": "Admiralty", "remote": false},
-      {"sub_cn": "半山", "sub_en": "Mid-levels", "remote": false},
-      {"sub_cn": "山頂", "sub_en": "Peak", "remote": false}
+      { "sub_cn": "堅尼地城", "sub_en": "Kennedy Town", "remote": false },
+      { "sub_cn": "石塘咀",   "sub_en": "Shek Tong Tsui", "remote": false },
+      { "sub_cn": "西營盤",   "sub_en": "Sai Ying Pun", "remote": false },
+      { "sub_cn": "西環",     "sub_en": "Sai Wan", "remote": false },
+      { "sub_cn": "上環",     "sub_en": "Sheung Wan", "remote": false },
+      { "sub_cn": "中環",     "sub_en": "Central", "remote": false },
+      { "sub_cn": "金鐘",     "sub_en": "Admiralty", "remote": false },
+      { "sub_cn": "半山",     "sub_en": "Mid-levels", "remote": false },
+      { "sub_cn": "山頂",     "sub_en": "Peak", "remote": false },
+      { "sub_cn": "寶翠園", "sub_en": "The Belcher's", "remote": false }
     ]
   },
   {
@@ -22,33 +24,42 @@
       {"sub_cn": "跑馬地", "sub_en": "Happy Valley", "remote": false},
       {"sub_cn": "大坑", "sub_en": "Tai Hang", "remote": false},
       {"sub_cn": "大潭", "sub_en": "Tai Tam", "remote": false},
-      {"sub_cn": "石澳", "sub_en": "Shek O", "remote": true}
+      {"sub_cn": "石澳", "sub_en": "Shek O", "remote": true},
+      {"sub_cn": "會展中心","sub_en": "Hong Kong Convention and Exhibition Centre","remote": false}
     ]
   },
   {
     "district_cn": "東區",
     "district_en": "Eastern",
     "sub_districts": [
-      {"sub_cn": "北角", "sub_en": "North Point", "remote": false},
-      {"sub_cn": "炮台山", "sub_en": "Fortress Hill", "remote": false},
-      {"sub_cn": "鰂魚湧", "sub_en": "Quarry Bay", "remote": false},
-      {"sub_cn": "太古", "sub_en": "Taikoo", "remote": false},
-      {"sub_cn": "西灣河", "sub_en": "Sai Wan Ho", "remote": false},
-      {"sub_cn": "筲箕灣", "sub_en": "Shau Kei Wan", "remote": false},
-      {"sub_cn": "柴灣", "sub_en": "Chai Wan", "remote": false}
+      { "sub_cn": "北角",   "sub_en": "North Point", "remote": false },
+      { "sub_cn": "炮臺山", "sub_en": "Fortress Hill", "remote": false },
+      { "sub_cn": "鰂魚湧", "sub_en": "Quarry Bay", "remote": false },
+      { "sub_cn": "太古",   "sub_en": "Taikoo", "remote": false },
+      { "sub_cn": "太古城", "sub_en": "Taikoo Shing", "remote": false },
+      { "sub_cn": "西灣河", "sub_en": "Sai Wan Ho", "remote": false },
+      { "sub_cn": "筲箕灣", "sub_en": "Shau Kei Wan", "remote": false },
+      { "sub_cn": "杏花村", "sub_en": "Heng Fa Chuen", "remote": false },
+      { "sub_cn": "柴灣",   "sub_en": "Chai Wan", "remote": false },
+      { "sub_cn": "小西灣", "sub_en": "Siu Sai Wan", "remote": false },
+      { "sub_cn": "天后", "sub_en": "Tin Hau", "remote": false },
+      { "sub_cn": "炮台山", "sub_en": "Fortress Hill", "remote": false }
     ]
   },
   {
     "district_cn": "南區",
     "district_en": "Southern",
     "sub_districts": [
-      {"sub_cn": "香港仔", "sub_en": "Aberdeen", "remote": false},
-      {"sub_cn": "鴨脷洲", "sub_en": "Ap Lei Chau", "remote": false},
-      {"sub_cn": "深水灣", "sub_en": "Deep Water Bay", "remote": false},
-      {"sub_cn": "淺水灣", "sub_en": "Repulse Bay", "remote": false},
-      {"sub_cn": "赤柱", "sub_en": "Stanley", "remote": false},
-      {"sub_cn": "壽臣山", "sub_en": "Shouson Hill", "remote": false},
-      {"sub_cn": "石澳", "sub_en": "Shek O", "remote": true}
+      { "sub_cn": "香港仔", "sub_en": "Aberdeen", "remote": false },
+      { "sub_cn": "鴨脷洲", "sub_en": "Ap Lei Chau", "remote": false },
+      { "sub_cn": "深水灣", "sub_en": "Deep Water Bay", "remote": false },
+      { "sub_cn": "淺水灣", "sub_en": "Repulse Bay", "remote": false },
+      { "sub_cn": "赤柱", "sub_en": "Stanley", "remote": false },
+      { "sub_cn": "壽臣山", "sub_en": "Shouson Hill", "remote": false },
+      { "sub_cn": "石澳", "sub_en": "Shek O", "remote": true },
+      { "sub_cn": "黃竹坑", "sub_en": "Wong Chuk Hang", "remote": false },
+      { "sub_cn": "薄扶林", "sub_en": "Pok Fu Lam", "remote": false },
+      { "sub_cn": "紅山半島前", "sub_en": "Redhill Peninsula", "remote": false }
     ]
   },
   {
@@ -60,7 +71,9 @@
       {"sub_cn": "旺角", "sub_en": "Mong Kok", "remote": false},
       {"sub_cn": "大角咀", "sub_en": "Tai Kok Tsui", "remote": false},
       {"sub_cn": "佐敦", "sub_en": "Jordan", "remote": false},
-      {"sub_cn": "西九龍填海區", "sub_en": "West Kowloon Reclamation", "remote": false}
+      {"sub_cn": "西九龍填海區", "sub_en": "West Kowloon Reclamation", "remote": false},
+      { "sub_cn": "太子", "sub_en": "Prince Edward", "remote": false},
+      { "sub_cn": "柯士甸", "sub_en": "Austin", "remote": false}
     ]
   },
   {
@@ -139,7 +152,9 @@
       {"sub_cn": "深井", "sub_en": "Sham Tseng", "remote": true},
       {"sub_cn": "青龍頭", "sub_en": "Tsing Lung Tau", "remote": true},
       {"sub_cn": "馬灣", "sub_en": "Ma Wan", "remote": true},
-      {"sub_cn": "欣澳", "sub_en": "Sunny Bay", "remote": true}
+      {"sub_cn": "欣澳", "sub_en": "Sunny Bay", "remote": true},
+      {"sub_cn": "河背村", "sub_en": "Ho Pui Tsuen", "remote": false },
+      {"sub_cn": "珀麗灣", "sub_en": "Park Island", "remote": true}
     ]
   },
   {
@@ -149,7 +164,8 @@
       {"sub_cn": "大欖湧", "sub_en": "Tai Lam Chung", "remote": true},
       {"sub_cn": "掃管笏", "sub_en": "So Kwun Wat", "remote": true},
       {"sub_cn": "屯門", "sub_en": "Tuen Mun", "remote": false},
-      {"sub_cn": "藍地", "sub_en": "Lam Tei", "remote": false}
+      {"sub_cn": "藍地", "sub_en": "Lam Tei", "remote": false},
+      { "sub_cn": "龍鼓灘", "sub_en": "Lung Kwu Tan", "remote": true }
     ]
   },
   {
@@ -178,7 +194,9 @@
       {"sub_cn": "石湖墟", "sub_en": "Shek Wu Hui", "remote": false},
       {"sub_cn": "沙頭角", "sub_en": "Sha Tau Kok", "remote": true},
       {"sub_cn": "鹿頸", "sub_en": "Luk Keng", "remote": true},
-      {"sub_cn": "烏蛟騰", "sub_en": "Wu Kau Tang", "remote": true}
+      {"sub_cn": "烏蛟騰", "sub_en": "Wu Kau Tang", "remote": true},
+      { "sub_cn": "鹿頸南涌", "sub_en": "Luk Keng Nam Chung", "remote": true }
+
     ]
   },
   {
@@ -225,11 +243,13 @@
     "sub_districts": [
       {"sub_cn": "長洲", "sub_en": "Cheung Chau", "remote": true},
       {"sub_cn": "坪洲", "sub_en": "Peng Chau", "remote": true},
-      {"sub_cn": "大嶼山（包括東涌）", "sub_en": "Lantau Island (incl. Tung Chung)", "remote": true},
+      {"sub_cn": "大嶼山", "sub_en": "Lantau Island", "remote": true},
+      {"sub_cn": "東涌", "sub_en": "Tung Chung", "remote": true},
       {"sub_cn": "南丫島", "sub_en": "Lamma Island", "remote": true},
       {"sub_cn": "愉景灣", "sub_en": "Discovery Bay", "remote": true},
       {"sub_cn": "梅窩", "sub_en": "Mui Wo", "remote": true},
-      {"sub_cn": "迪士尼樂園", "sub_en": "Disneyland", "remote": true}
+      {"sub_cn": "迪士尼樂園", "sub_en": "Disneyland", "remote": true},
+      { "sub_cn": "赤臘角國際機場", "sub_en": "Chek Lap Kok International Airport", "remote": true }
     ]
   }
 ]

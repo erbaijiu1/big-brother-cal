@@ -1,5 +1,6 @@
 <template>
   <view class="container">
+    <!-- 分类 -->
     <view class="form-item">
       <text class="label">分类</text>
       <picker :range="categories" range-key="main" @change="onCategoryChange">
@@ -7,34 +8,28 @@
           <text class="main-category">{{ selectedCategoryMain || '请选择分类' }}</text>
         </view>
       </picker>
-      <!-- 子类说明在框外、浅灰色显示 -->
       <view v-if="selectedCategorySub" class="sub-category-desc">{{ selectedCategorySub }}</view>
     </view>
 
+    <!-- 重量 -->
     <view class="form-item">
       <text class="label">重量（kg）</text>
       <input type="number" v-model="weight" placeholder="请输入重量" class="input" />
     </view>
-
+    <!-- 体积 -->
     <view class="form-item">
       <text class="label">体积（m³）</text>
       <input type="number" v-model="volume" placeholder="请输入体积" class="input" />
     </view>
-
+    <!-- 地址（分区/小区） -->
     <view class="form-item address-row">
       <text class="label">地址</text>
       <view class="address-select-wrap">
-        <!-- 大区选择 -->
         <picker :range="districts" range-key="district_cn" @change="onDistrictChange">
-          <view class="select-box">
-            {{ selectedDistrictName || '请选择大区' }}
-          </view>
+          <view class="select-box">{{ selectedDistrictName || '请选择大区' }}</view>
         </picker>
-        <!-- 小区选择 -->
         <picker :range="subDistricts" range-key="sub_cn" @change="onSubDistrictChange" :disabled="!selectedDistrict">
-          <view class="select-box">
-            {{ selectedSubDistrictName || '请选择小区' }}
-          </view>
+          <view class="select-box">{{ selectedSubDistrictName || '请选择小区' }}</view>
         </picker>
       </view>
       <view v-if="isRemote !== null" class="remote-tip" :class="{ remote: isRemote }">
@@ -42,57 +37,76 @@
       </view>
     </view>
 
-    <!-- <view class="form-item">
-      <text class="label">地址</text>
-      <input v-model="addressTo" placeholder="目的地" class="input" />
-    </view> -->
-
-    <!-- <view class="form-item">
-      <text class="label">货物类型</text>
-      <radio-group class="radio-group" v-model="packageType">
-        <label class="radio-label"><radio value="袋装" class="mini-radio" /> 袋装</label>
-        <label class="radio-label"><radio value="整托" class="mini-radio" /> 整托</label>
-      </radio-group>
-    </view> -->
-
+    <!-- 是否需要上楼 -->
     <view class="form-item">
-      <text class="label">是否电梯</text>
-      <radio-group class="radio-group" v-model="hasElevator">
+      <text class="label">是否需要上楼</text>
+      <radio-group class="radio-group" :value="needGoUpstairs" @change="onNeedGoUpstairsChange">
         <label class="radio-label">
-          <radio value="是" class="mini-radio" /> 有
+          <radio :value="'1'" :checked="needGoUpstairs === '1'" class="mini-radio" /> 是
         </label>
         <label class="radio-label">
-          <radio value="否" class="mini-radio" /> 无
+          <radio :value="'0'" :checked="needGoUpstairs === '0'" class="mini-radio" /> 否
         </label>
       </radio-group>
     </view>
 
-    <view class="form-item">
-      <text class="label">是否搬楼</text>
-      <radio-group class="radio-group" v-model="needStairs">
-        <label class="radio-label">
-          <radio value="是" class="mini-radio" /> 是
-        </label>
-        <label class="radio-label">
-          <radio value="否" class="mini-radio" /> 否
-        </label>
-      </radio-group>
+    <!-- 仅当上楼显示 -->
+    <view v-if="needGoUpstairs === '1'">
+      <view class="form-item">
+        <text class="label">是否电梯</text>
+        <radio-group class="radio-group" :value="hasElevator" @change="e => hasElevator = e.detail.value">
+          <label class="radio-label">
+            <radio :value="'1'" :checked="hasElevator === '1'" class="mini-radio" /> 有
+          </label>
+          <label class="radio-label">
+            <radio :value="'0'" :checked="hasElevator === '0'" class="mini-radio" /> 无
+          </label>
+        </radio-group>
+      </view>
+      <view class="form-item">
+        <text class="label">是否搬阶梯</text>
+        <radio-group class="radio-group" :value="needStairs" @change="e => needStairs = e.detail.value">
+          <label class="radio-label">
+            <radio :value="'1'" :checked="needStairs === '1'" class="mini-radio" /> 是
+          </label>
+          <label class="radio-label">
+            <radio :value="'0'" :checked="needStairs === '0'" class="mini-radio" /> 否
+          </label>
+        </radio-group>
+      </view>
     </view>
 
+    <!-- 报价按钮 -->
     <button class="submit-button" @click="submit">我要报价</button>
 
+    <!-- 报价结果弹窗 -->
     <uni-popup ref="resultPopup" type="dialog">
       <view class="popup">
         <text class="popup-title">报价结果</text>
         <view v-for="(item, index) in resultList" :key="index" class="quote-item">
-          <text>
-            方案{{ index + 1 }}：<text class="price">{{ item.total_price }}</text> 元，
-            渠道：{{ item.channel }}，
-            运输：{{ item.transport_method }}，
-            仓库：{{ item.warehouse }}
-          </text>
+          <view class="quote-row">
+            <text>
+              方案{{ index + 1 }}：
+              <text class="price">{{ item.total_price }}</text> 元，
+              渠道：{{ item.channel }}，
+              运输：{{ item.transport_method }}，
+              仓库：{{ item.warehouse }}
+            </text>
+            <button v-if="item.remark" class="remark-btn" @click="showRemark(item.remark)">备注</button>
+          </view>
         </view>
         <button class="popup-button" @click="contactCustomer">联系客服领优惠</button>
+      </view>
+    </uni-popup>
+
+    <!-- 备注弹窗 -->
+    <uni-popup ref="remarkPopup" type="center">
+      <view class="big-remark-popup">
+        <text class="popup-title">规则备注</text>
+        <scroll-view class="remark-content-scroll" scroll-y>
+          <view class="remark-content">{{ currentRemark }}</view>
+        </scroll-view>
+        <button class="popup-button" @click="closeRemark">关闭</button>
       </view>
     </uni-popup>
   </view>
@@ -101,9 +115,13 @@
 <script>
 import { BASE_URL } from '@/common/config'
 import hkDistricts from '@/common/hk_districts.json'
+import uniPopup from '@dcloudio/uni-ui/lib/uni-popup/uni-popup.vue'
+
 
 export default {
+  components: { uniPopup },
   data() {
+
     return {
       categories: [],
       selectedCategory: null,
@@ -114,17 +132,19 @@ export default {
       addressFrom: '',
       addressTo: '',
       packageType: '袋装',
-      hasElevator: '是',
-      needStairs: '否',
-      resultList: []
-      , districts: hkDistricts,        // 大区json
-      subDistricts: [],     // 当前选中的大区下的小区列表
+      hasElevator: '1',
+      needStairs: '0',
+      resultList: [],
+      districts: hkDistricts,
+      subDistricts: [],
       selectedDistrict: null,
       selectedDistrictName: '',
       selectedSubDistrict: null,
       selectedSubDistrictName: '',
-      isRemote: null,       // 是否偏远
-    };
+      isRemote: null,
+      needGoUpstairs: '0',
+      currentRemark: ''
+    }
   },
   onLoad() {
     this.loadCategories();
@@ -154,44 +174,45 @@ export default {
       this.selectedCategorySub = selected.sub;
     },
     submit() {
-      // 校验
       if (!this.selectedCategory) {
-        uni.showToast({ title: '请选择分类', icon: 'none' });
-        return;
+        uni.showToast({ title: '请选择分类', icon: 'none' }); return;
       }
       if (!this.weight || !this.volume) {
-        uni.showToast({ title: '请填写重量和体积', icon: 'none' });
-        return;
+        uni.showToast({ title: '请填写重量和体积', icon: 'none' }); return;
+      }
+      let extra = {
+        to_address: this.addressTo,
+        type: this.packageType,
+        need_go_upstairs: this.needGoUpstairs,
+        district: this.selectedDistrict,
+        sub_district: this.selectedSubDistrict,
+        is_remote: this.isRemote,
+      };
+      if (this.needGoUpstairs === '1') {
+        extra.has_elevator = this.hasElevator;
+        extra.need_stairs = this.needStairs;
       }
       uni.request({
         url: `${BASE_URL}/cal_price/pricing_rule/min_pricing`,
         method: 'POST',
         data: {
-          category_id: Number(this.selectedCategory), // 保证数字类型
+          category_id: Number(this.selectedCategory),
           weight: Number(this.weight),
           volume: Number(this.volume),
-          extra_fee_data: {
-            to_address: this.addressTo,
-            type: this.packageType,
-            has_elevator: this.hasElevator,
-            need_stairs: this.needStairs,
-            district: this.selectedDistrict,
-            sub_district: this.selectedSubDistrict,
-            is_remote: this.isRemote,
-          }
+          extra_fee_data: extra
         },
         success: (res) => {
+          console.log('popup ref is:', this.$refs.resultPopup)
+
           this.resultList = (res.data && res.data.data) ? res.data.data : [];
           this.$refs.resultPopup.open();
         }
       });
     },
     contactCustomer() {
-      uni.navigateTo({
-        url: '/pages/contact/index'
-      });
-    }
-    , onDistrictChange(e) {
+      uni.navigateTo({ url: '/pages/contact/index' });
+    },
+    onDistrictChange(e) {
       const idx = e.detail.value;
       const district = this.districts[idx];
       this.selectedDistrict = district.district_cn;
@@ -207,6 +228,17 @@ export default {
       this.selectedSubDistrict = sub.sub_cn;
       this.selectedSubDistrictName = sub.sub_cn;
       this.isRemote = sub.remote;
+    },
+    showRemark(remark) {
+      this.currentRemark = remark;
+      this.$refs.remarkPopup.open();
+    },
+    closeRemark() {
+      this.$refs.remarkPopup.close();
+    },
+    // 兼容所有端的 onChange
+    onNeedGoUpstairsChange(e) {
+      this.needGoUpstairs = (e.detail && e.detail.value) ? e.detail.value : e.target.value;
     },
   }
 };
@@ -250,8 +282,8 @@ export default {
   margin-left: 6rpx;
 }
 .radio-group {
-  display: flex;
-  flex-wrap: wrap;
+  display: flex !important;
+  flex-direction: row !important;
   gap: 40rpx;
   margin-top: 20rpx;
 }
@@ -260,6 +292,7 @@ export default {
   align-items: center;
   font-size: 28rpx;
   color: #333;
+  margin-right: 24rpx;
 }
 .mini-radio >>> .uni-radio-input,
 .mini-radio >>> .uni-radio-input-checked {
@@ -287,6 +320,9 @@ export default {
   padding: 40rpx;
   background: #fff;
   border-radius: 20rpx;
+  max-height: 80vh; /* 限制最大高度为屏幕的80% */
+  overflow-y: auto; /* 内容超出时显示滚动条 */
+  box-sizing: border-box; /* 确保内边距不影响总高度 */
 }
 .popup-title {
   font-size: 36rpx;
@@ -297,10 +333,31 @@ export default {
   padding: 20rpx 0;
   border-bottom: 1px solid #eee;
   font-size: 30rpx;
+  display: flex;
+  align-items: center;
 }
 .price {
   font-weight: bold;
   color: #e64340;
+}
+.remark-btn {
+  margin-left: 18rpx;
+  padding: 8rpx 24rpx;
+  font-size: 24rpx;
+  background: #f4f6f9;
+  color: #007aff;
+  border: 1px solid #007aff;
+  border-radius: 8rpx;
+}
+.remark-content {
+  color: #333;
+  font-size: 26rpx;
+  margin-bottom: 20rpx;
+  padding: 10rpx 0;
+  /* 自动填充剩余空间，配合父容器 max-height 使用 */
+  flex: 1; 
+  /* 防止内容换行导致高度计算错误 */
+  word-break: break-all; 
 }
 .popup-button {
   margin-top: 40rpx;
@@ -312,7 +369,6 @@ export default {
   width: 100%;
   box-sizing: border-box;
 }
-
 .address-row .address-select-wrap {
   display: flex;
   flex-direction: row;
@@ -340,5 +396,50 @@ export default {
   color: #ff9800;
   font-weight: bold;
 }
+.quote-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.remark-btn {
+  margin-left: 10rpx;
+  padding: 8rpx 24rpx;
+  font-size: 24rpx;
+  background: #f4f6f9;
+  color: #007aff;
+  border: 1px solid #007aff;
+  border-radius: 8rpx;
+}
+.big-remark-popup {
+  width: 700rpx;
+  max-width: 96vw;
+  min-height: 500rpx;
+  max-height: 90vh;
+  border-radius: 24rpx;
+  background: #fff;
+  padding: 40rpx 28rpx 20rpx 28rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  box-shadow: 0 16rpx 48rpx rgba(0,0,0,0.13);
+}
 
+.remark-content-scroll {
+  width: 100%;
+  flex: 1 1 0;
+  max-height: 450rpx;
+  overflow-y: auto;
+  margin: 16rpx 0 24rpx 0;
+  background: #fafafa;
+  border-radius: 12rpx;
+  padding: 16rpx;
+}
+
+.remark-content {
+  color: #333;
+  font-size: 28rpx;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 </style>

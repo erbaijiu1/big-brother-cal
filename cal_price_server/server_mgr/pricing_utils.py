@@ -59,6 +59,7 @@ def match_range(v, r):
     start, end = parse_range(r)
     return start < v <= end
 
+
 def calculate_rule_group(group: list, volume: float, weight: float, destination: str) -> float:
     prices = []
     for rule in group:
@@ -70,6 +71,7 @@ def calculate_rule_group(group: list, volume: float, weight: float, destination:
                 prices.append(rule['price'])
     return max(prices) if prices else 0
 
+
 def calculate_surcharge_total(context, surcharge_rules) -> float:
     context = context or {}
     volume = context.get('volume', 0)
@@ -79,6 +81,66 @@ def calculate_surcharge_total(context, surcharge_rules) -> float:
     total = 0
     for key, group in surcharge_rules.items():
         total += calculate_rule_group(group, volume, weight, destination)
+    return total
+
+
+def get_total_surcharge(params: dict, config: dict, weight, volume) -> float:
+    """
+    计算总费用。
+
+    params: {
+        "district_cn": str,
+        "sub_cn": str,
+        "volume": float,
+        "weight": float,
+        "elevator_required": bool
+    }
+    config: 您提供的费率 JSON 结构，已解析为 Python dict。
+    """
+    district = params["district"]
+    sub = params["sub_district"]
+    vol = volume
+    wt = weight
+    elev = params["need_go_upstairs"]
+
+    total = 0.0
+
+    # 1. 过海费
+    if "sea_crossing_fee" in config:
+        for fee in config["sea_crossing_fee"]:
+            districts = [d.strip() for d in fee["district_cn_in"].split(",")]
+            vmin, vmax = map(float, fee["volume_range"].split("-"))
+            wmin, wmax = map(float, fee["weight_range"].split("-"))
+            if district in districts and vmin < vol <= vmax and wmin < wt <= wmax:
+                total += fee["price"]
+                break  # 匹配第一个符合的规则
+
+    # 2. 地区附加费
+    if "area_fee" in config:
+        for fee in config["area_fee"]:
+            subs = [s.strip() for s in fee["sub_districts_in"].replace("，", ",").split(",")]
+            if sub in subs:
+                total += fee["price"]
+                break
+
+    # 3. 远程区附加费（多档或取最高档）
+    max_remote = 0
+    if "remote_area_add_fee" in config:
+        for fee in config["remote_area_add_fee"]:
+            subs = [s.strip() for s in fee["sub_districts_in"].replace("，", ",").split(",")]
+            if sub in subs:
+                # 如果想累加所有档次就用 total += fee["price"]
+                # 这里示例取最高档
+                if fee["price"] > max_remote:
+                    max_remote = fee["price"]
+    total += max_remote
+
+    # 4. 电梯搬运费
+    if elev and "elevator_handling_fee" in config:
+        elev_cfg = config["elevator_handling_fee"]
+        fee_amount = vol * elev_cfg["price"]
+        total += max(fee_amount, elev_cfg["minimum"])
+
     return total
 
 
@@ -97,16 +159,16 @@ def calculate_range_fee(value: float, rules: list) -> float:
     return 0  # 若无匹配规则，默认返回 0（或可改为抛异常）
 
 
-def calculate_total_price(rule: PricingRule, weight: float, volume: float, extra_fee_data: Dict[str, Any]) -> float:
+def calculate_total_price(rule: PricingRule, weight: float, volume: float, extra_fee_data: Dict[str, Any]):
     try:
         unit_rules = json.loads(rule.unit_price_rules)
         delivery_rules = json.loads(rule.delivery_fee_rules or '[]')
 
         def get_price(rules, key, value):
-            for rule in rules:
-                start, end = map(float, rule['range'].split('-'))
-                if start <= value < end:
-                    return rule.get('unit_price', 0) * value + rule.get('total_prize', 0)
+            for price_rule in rules:
+                start, end = map(float, price_rule['range'].split('-'))
+                if start < value < end:
+                    return price_rule.get('unit_price', 0) * value + price_rule.get('total_prize', 0)
             return 0
 
         kg_price = get_price([r for r in unit_rules if r['prize_type'] == 'KG'], 'weight', weight)
@@ -123,23 +185,21 @@ def calculate_total_price(rule: PricingRule, weight: float, volume: float, extra
         # 取较高值作为最终派送费
         delivery_price = max(weight_fee, volume_fee)
 
+        channel_config = get_surcharge_config_by_channel(rule.channel)
+
         # 获取附加费用
-        extra_fee = get_total_surcharge_by_channel(rule.channel, extra_fee_data)
+        extra_fee = get_total_surcharge_by_channel(channel_config, extra_fee_data, weight, volume)
         logger.info(f"单价费用：{unit_price},派送费：{delivery_price},附加费用：{extra_fee}")
 
         total = unit_price + delivery_price + extra_fee
-        return total
+        return total, channel_config
     except Exception as e:
         logger.error(f"Error in price calculation: {e}")
         return float('inf')
 
 
-def get_total_surcharge_by_channel(channel: str, context) -> float:
+def get_total_surcharge_by_channel(channel_config, context, weight, volume) -> float:
     try:
-        channel_config = get_surcharge_config_by_channel(channel)
-        if not channel_config:
-            return 0
-
         surcharge_rule = channel_config.surcharge_rules
         if not surcharge_rule:
             return 0
@@ -147,7 +207,9 @@ def get_total_surcharge_by_channel(channel: str, context) -> float:
         print(f"id:{channel_config.id}, surcharge_rule:{surcharge_rule}")
 
         surcharge_rules = json.loads(surcharge_rule)
-        return calculate_surcharge_total(context, surcharge_rules)
+        return get_total_surcharge(context, surcharge_rules, weight, volume)
+        # return calculate_surcharge_total(context, surcharge_rules)
+
 
     except Exception as e:
         logger.error(f"Error in surcharge calculation: {e}", exc_info=True)
