@@ -82,6 +82,21 @@ def calculate_surcharge_total(context, surcharge_rules) -> float:
     return total
 
 
+def calculate_range_fee(value: float, rules: list) -> float:
+    for rule in rules:
+        low, high = map(float, rule["range"].split("-"))
+        if low < value <= high:
+            if "price" in rule:
+                return rule["price"]
+            elif "unit_price" in rule:
+                base = rule.get("base_fees", 0)
+                if "deduction_value" in rule:
+                    value -= rule["deduction_value"]
+
+                return round(base + value * rule["unit_price"], 2)
+    return 0  # 若无匹配规则，默认返回 0（或可改为抛异常）
+
+
 def calculate_total_price(rule: PricingRule, weight: float, volume: float, extra_fee_data: Dict[str, Any]) -> float:
     try:
         unit_rules = json.loads(rule.unit_price_rules)
@@ -98,12 +113,19 @@ def calculate_total_price(rule: PricingRule, weight: float, volume: float, extra
         cbm_price = get_price([r for r in unit_rules if r['prize_type'] == 'CBM'], 'volume', volume)
         unit_price = max(kg_price, cbm_price)
 
-        kg_delivery = get_price([r for r in delivery_rules if r['prize_type'] == 'KG'], 'weight', weight)
-        cbm_delivery = get_price([r for r in delivery_rules if r['prize_type'] == 'CBM'], 'volume', volume)
-        delivery_price = max(kg_delivery, cbm_delivery)
+        #kg_delivery = get_price([r for r in delivery_rules if r['prize_type'] == 'KG'], 'weight', weight)
+        #cbm_delivery = get_price([r for r in delivery_rules if r['prize_type'] == 'CBM'], 'volume', volume)
+        #delivery_price = max(kg_delivery, cbm_delivery)
+
+        # 使用示例
+        weight_fee = calculate_range_fee(weight, [r for r in delivery_rules if r["prize_type"] == "KG"])
+        volume_fee = calculate_range_fee(volume, [r for r in delivery_rules if r["prize_type"] == "CBM"])
+        # 取较高值作为最终派送费
+        delivery_price = max(weight_fee, volume_fee)
 
         # 获取附加费用
         extra_fee = get_total_surcharge_by_channel(rule.channel, extra_fee_data)
+        logger.info(f"单价费用：{unit_price},派送费：{delivery_price},附加费用：{extra_fee}")
 
         total = unit_price + delivery_price + extra_fee
         return total
@@ -121,6 +143,8 @@ def get_total_surcharge_by_channel(channel: str, context) -> float:
         surcharge_rule = channel_config.surcharge_rules
         if not surcharge_rule:
             return 0
+
+        print(f"id:{channel_config.id}, surcharge_rule:{surcharge_rule}")
 
         surcharge_rules = json.loads(surcharge_rule)
         return calculate_surcharge_total(context, surcharge_rules)
