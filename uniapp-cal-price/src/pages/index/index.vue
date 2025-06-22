@@ -99,16 +99,17 @@
       </view>
     </uni-popup>
 
-    <!-- 备注弹窗 -->
-    <uni-popup ref="remarkPopup" type="center">
+    <!-- ✅ 弹窗结构建议 -->
+    <uni-popup ref="remarkPopup" type="bottom">
       <view class="big-remark-popup">
+        <view class="close-icon" @click="closeRemark">&#x2715;</view>
         <text class="popup-title">规则备注</text>
         <scroll-view class="remark-content-scroll" scroll-y>
           <view class="remark-content">{{ currentRemark }}</view>
         </scroll-view>
-        <button class="popup-button" @click="closeRemark">关闭</button>
       </view>
     </uni-popup>
+
   </view>
 </template>
 
@@ -327,7 +328,9 @@ export default {
 .popup-title {
   font-size: 36rpx;
   font-weight: bold;
-  margin-bottom: 30rpx;
+  margin-bottom: 20rpx;
+  padding-right: 80rpx; /* 留出空间避免文字被覆盖 */
+  text-align: center;
 }
 .quote-item {
   padding: 20rpx 0;
@@ -411,18 +414,19 @@ export default {
   border-radius: 8rpx;
 }
 .big-remark-popup {
-  width: 700rpx;
-  max-width: 96vw;
-  min-height: 500rpx;
+  position: relative; /* ✅ 必须要加 */
+  width: 100vw;
+  min-height: 50vh;
   max-height: 90vh;
-  border-radius: 24rpx;
+  border-top-left-radius: 24rpx;
+  border-top-right-radius: 24rpx;
   background: #fff;
   padding: 40rpx 28rpx 20rpx 28rpx;
   display: flex;
   flex-direction: column;
-  align-items: center;
   box-sizing: border-box;
-  box-shadow: 0 16rpx 48rpx rgba(0,0,0,0.13);
+  box-shadow: 0 -6rpx 24rpx rgba(0, 0, 0, 0.1);
+  overflow: hidden; /* 防止内容撑开影响布局 */
 }
 
 .remark-content-scroll {
@@ -441,5 +445,25 @@ export default {
   font-size: 28rpx;
   white-space: pre-wrap;
   word-break: break-all;
+}
+.close-icon {
+  position: absolute;
+  top: 20rpx;
+  right: 20rpx;
+  font-size: 40rpx;
+  color: #999;
+  z-index: 10;
+  background: #eee;
+  border-radius: 50%;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.1);
+  transition: background 0.2s ease;
+}
+.close-icon:hover {
+  background: #ddd;
 }
 </style>
