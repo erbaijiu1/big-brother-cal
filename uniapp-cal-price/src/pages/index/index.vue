@@ -92,8 +92,17 @@
               运输：{{ item.transport_method }}，
               仓库：{{ item.warehouse }}
             </text>
+
             <button v-if="item.remark" class="remark-btn" @click="showRemark(item.remark)">备注</button>
+            <view class="fee-details">
+              <view v-for="fee in item.fee_details" :key="fee.name" class="fee-row">
+                <text class="fee-name">{{ fee.cn_name }}:</text>
+                <text class="fee-amount">{{ fee.amount }}, </text>
+              </view>
+            </view>
           </view>
+
+
         </view>
         <button class="popup-button" @click="contactCustomer">联系客服领优惠</button>
       </view>
@@ -103,7 +112,7 @@
     <uni-popup ref="remarkPopup" type="bottom">
       <view class="big-remark-popup">
         <view class="close-icon" @click="closeRemark">&#x2715;</view>
-        <text class="popup-title">规则备注</text>
+        <text class="popup-title">备注信息</text>
         <view class="remark-scroll-view">
           <view class="remark-content">{{ currentRemark }}</view>
         </view>
@@ -486,4 +495,30 @@ export default {
     opacity: 1;
   }
 }
+
+.fee-details{
+  display: flex;
+  flex-direction: column;
+  margin-top: 20rpx;
+  font-size: 28rpx;
+}
+.fee-row {
+  font-size: 26rpx;
+  margin-top: 2rpx;
+  color: #888; /* 整行灰色 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* 可选，用于垂直居中 */
+}
+
+.fee-name {
+  min-width: 160rpx;
+  font-weight: 400;
+  color: #888;   /* 灰色说明 */
+}
+.fee-amount {
+  color: #888;   /* 灰色说明 */
+  margin-left: 32rpx;
+}
+
 </style>

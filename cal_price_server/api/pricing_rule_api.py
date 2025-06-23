@@ -19,7 +19,9 @@ async def get_best_quotes(data: QuoteRequest):
 
         for rule in rules:
             try:
-                total_price, channel_conf = calculate_total_price(rule, weight, volume, extra_fee_data)
+                total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, extra_fee_data)
+                if total_price <= 0:
+                    continue
                 quote_list.append({
                     "channel": rule.channel,
                     "transport_method": rule.transport_method,
@@ -27,12 +29,11 @@ async def get_best_quotes(data: QuoteRequest):
                     "total_price": round(total_price, 2),
                     "rule_id": rule.id
                     , "remark": channel_conf.remark if channel_conf else ""
+                    , "fee_details": fee_details
                 })
                 logger.info(f"Quote for channel {rule.channel} is {total_price}")
             except Exception as e:
                 logger.error(f"Failed to calculate quote for channel {rule.channel}: {e}", exc_info=True)
-
-
 
         sorted_quotes = sorted(quote_list, key=lambda x: x['total_price'])
         return {"code": 200, "message": "success", "data": sorted_quotes}
