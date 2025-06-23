@@ -104,9 +104,9 @@
       <view class="big-remark-popup">
         <view class="close-icon" @click="closeRemark">&#x2715;</view>
         <text class="popup-title">规则备注</text>
-        <scroll-view class="remark-content-scroll" scroll-y>
+        <view class="remark-scroll-view">
           <view class="remark-content">{{ currentRemark }}</view>
-        </scroll-view>
+        </view>
       </view>
     </uni-popup>
 
@@ -133,7 +133,7 @@ export default {
       addressFrom: '',
       addressTo: '',
       packageType: '袋装',
-      hasElevator: '1',
+      hasElevator: '0',
       needStairs: '0',
       resultList: [],
       districts: hkDistricts,
@@ -188,11 +188,9 @@ export default {
         district: this.selectedDistrict,
         sub_district: this.selectedSubDistrict,
         is_remote: this.isRemote,
+        has_elevator: this.hasElevator,
+        need_stairs: this.needStairs
       };
-      if (this.needGoUpstairs === '1') {
-        extra.has_elevator = this.hasElevator;
-        extra.need_stairs = this.needStairs;
-      }
       uni.request({
         url: `${BASE_URL}/cal_price/pricing_rule/min_pricing`,
         method: 'POST',
@@ -326,11 +324,11 @@ export default {
   box-sizing: border-box; /* 确保内边距不影响总高度 */
 }
 .popup-title {
-  font-size: 36rpx;
+  font-size: 32rpx;
   font-weight: bold;
-  margin-bottom: 20rpx;
-  padding-right: 80rpx; /* 留出空间避免文字被覆盖 */
   text-align: center;
+  margin-bottom: 20rpx;
+  color: #222;
 }
 .quote-item {
   padding: 20rpx 0;
@@ -353,14 +351,12 @@ export default {
   border-radius: 8rpx;
 }
 .remark-content {
+  font-size: 28rpx;
   color: #333;
-  font-size: 26rpx;
-  margin-bottom: 20rpx;
-  padding: 10rpx 0;
-  /* 自动填充剩余空间，配合父容器 max-height 使用 */
-  flex: 1; 
-  /* 防止内容换行导致高度计算错误 */
-  word-break: break-all; 
+  line-height: 1.8;
+  text-align: justify;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .popup-button {
   margin-top: 40rpx;
@@ -414,19 +410,20 @@ export default {
   border-radius: 8rpx;
 }
 .big-remark-popup {
-  position: relative; /* ✅ 必须要加 */
-  width: 100vw;
-  min-height: 50vh;
-  max-height: 90vh;
-  border-top-left-radius: 24rpx;
-  border-top-right-radius: 24rpx;
+  position: relative;
+  width: 92vw;
+  min-height: 40vh;
+  max-height: 75vh;
+  border-top-left-radius: 28rpx;
+  border-top-right-radius: 28rpx;
   background: #fff;
-  padding: 40rpx 28rpx 20rpx 28rpx;
+  padding: 32rpx 24rpx;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  box-shadow: 0 -6rpx 24rpx rgba(0, 0, 0, 0.1);
-  overflow: hidden; /* 防止内容撑开影响布局 */
+  box-shadow: 0 -10rpx 32rpx rgba(0, 0, 0, 0.15);
+  margin: 0 auto;
+  animation: fadeInUp 0.3s ease;
 }
 
 .remark-content-scroll {
@@ -448,22 +445,45 @@ export default {
 }
 .close-icon {
   position: absolute;
-  top: 20rpx;
-  right: 20rpx;
-  font-size: 40rpx;
-  color: #999;
+  top: 16rpx;
+  right: 16rpx;
+  font-size: 36rpx;
+  color: #aaa;
   z-index: 10;
-  background: #eee;
+  background: #f0f0f0;
   border-radius: 50%;
-  width: 56rpx;
-  height: 56rpx;
+  width: 48rpx;
+  height: 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.1);
-  transition: background 0.2s ease;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.08);
 }
 .close-icon:hover {
-  background: #ddd;
+  background: #e0e0e0;
+
+}
+
+.remark-scroll-view {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 60vh;
+  background: #f9f9f9;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+
+/* 弹入过渡动画（可选） */
+@keyframes fadeInUp {
+  0% {
+    transform: translateY(100rpx);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 </style>

@@ -28,4 +28,7 @@ curl -X POST "localhost:8088/cal_prize/pricing_rule/min_pricing" -H "Content-Typ
 
 SHOW VARIABLES LIKE 'character_set_database';
 
+curl -X POST "localhost:8088/cal_prize/pricing_rule/min_pricing" -H "Content-Type: application/json" -d \
+'
+
 

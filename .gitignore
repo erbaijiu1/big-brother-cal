@@ -9,3 +9,6 @@ cal_price_server/db/__pycache__/
 cal_price_server/logs
 cal_price_server/api/__pycache__
 cal_price_server/server_mgr/__pycache__
+dist/
+logs/access.log
+logs/error.log
