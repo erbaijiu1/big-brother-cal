@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from api.goods_classify import router as classify_router
 from api.pricing_rule_api import router as pricing_rule_router
 import logging
@@ -21,6 +21,7 @@ app.add_middleware(
 
 # 配置简单的日志记录
 logging.basicConfig(level=logging.INFO)
+
 
 # 422异常处理
 @app.exception_handler(RequestValidationError)
@@ -45,6 +46,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         },
     )
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
     return JSONResponse(
@@ -54,6 +56,38 @@ async def http_exception_handler(request, exc: HTTPException):
             "message": exc.detail,
         },
     )
+
+
+# 全局请求／响应日志中间件
+@app.middleware("http")
+async def log_request_response(request: Request, call_next):
+    # 1. 读取并记录请求体
+    body_bytes = await request.body()
+    body_str = body_bytes.decode('utf-8') if body_bytes else "<empty>"
+    logging.info(f">>> REQUEST {request.method} {request.url.path} → Body: {body_str}")
+
+    # 2. 执行下一个处理器，获取 Response
+    response: Response = await call_next(request)
+
+    # 3. 读取并记录响应体
+    #    注意：Response.body_iterator 是异步生成，所以我们需要把它“吃”下来
+    resp_body = b""
+    async for chunk in response.body_iterator:
+        resp_body += chunk
+
+    # 4. 打日志
+    # text = resp_body.decode('utf-8', errors='replace')
+    # logging.info(f"<<< RESPONSE {request.method} {request.url.path} ← "
+    #              f"Status: {response.status_code} Body: {Bodytext}")
+
+    # 5. 因为我们已经消费了 body_iterator，需要用新的 Response 重建返回值
+    new_response = Response(
+        content=resp_body,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+        media_type=response.media_type
+    )
+    return new_response
 
 @app.get("/")
 async def root():

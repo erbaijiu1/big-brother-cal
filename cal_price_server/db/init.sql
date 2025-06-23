@@ -1,4 +1,5 @@
 use db_prize_cal;
+show tables;
 INSERT INTO t_goods_classification
 (main_category, sub_examples, description, temperature_req, hazard_level, storage_level)
 VALUES
@@ -16,7 +17,7 @@ VALUES
 ('液体食品 & 液体日化', '饮料、酱油、食用油；化妆水、洗手液', '防泄漏二次包装；需检验成分、标签；部分属危险品（酒精含量高）', '常温', '部分险', 'B / D（视风险）'),
 ('禁运 & 限运品', '枪弹、毒化剂、盗版货物、电池等', '系统屏蔽，不可下单；需遵守中港两地法律法规', '—', '禁运／限运', '禁运／限运');
 
-INSERT INTO t_goods_classification
+INSERT INTO db_prize_cal.t_goods_classification
 (main_category, sub_examples, description, temperature_req, hazard_level, storage_level)
 VALUES
 ('蔬菜水果', '西红柿、黄瓜、菠菜、生菜、苹果、香蕉、草莓',

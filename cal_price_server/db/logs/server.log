@@ -46,3 +46,10 @@ CREATE TABLE t_goods_classification (
 2025-06-16 11:17:26,231|[sqlalchemy_define.py: 29]|INFO|8812945152|鏁版嵁搴撳紩鎿庡凡鍒涘缓: mysql+pymysql://root:****:****@127.0.0.1:3306/db_prize_cal 
 2025-06-16 11:43:07,056|[sqlalchemy_define.py: 29]|INFO|8812945152|鏁版嵁搴撳紩鎿庡凡鍒涘缓: mysql+pymysql://root:****:****@127.0.0.1:3306/db_prize_cal 
 2025-06-16 17:11:33,017|[sqlalchemy_define.py: 29]|INFO|8812945152|鏁版嵁搴撳紩鎿庡凡鍒涘缓: mysql+pymysql://root:****:****@127.0.0.1:3306/db_prize_cal 
+2025-06-21 19:23:40,153|[sqlalchemy_define.py: 29]|INFO|5384|数据库引擎已创建: mysql+pymysql://root:****:****@127.0.0.1:3306/db_prize_cal 
+2025-06-21 19:23:40,207|[db_models.py: 75]|ERROR|5384|创建表失败: (pymysql.err.OperationalError) (1045, "Access denied for user 'root'@'localhost' (using password: YES)")
+(Background on this error at: https://sqlalche.me/e/20/e3q8) 
+2025-06-21 19:24:32,938|[sqlalchemy_define.py: 29]|INFO|20824|数据库引擎已创建: mysql+pymysql://root:****:****@127.0.0.1:3306/db_prize_cal 
+2025-06-21 19:30:34,644|[sqlalchemy_define.py: 29]|INFO|21908|数据库引擎已创建: mysql+pymysql://root:****:****@127.0.0.1:3306/db_prize_cal 
+2025-06-21 21:50:29,303|[sqlalchemy_define.py: 29]|INFO|23052|数据库引擎已创建: mysql+pymysql://price_user:****:****@192.168.56.109:3306/db_prize_cal 
+2025-06-21 21:56:14,285|[sqlalchemy_define.py: 29]|INFO|1204|数据库引擎已创建: mysql+pymysql://price_user:****:****@192.168.56.109:3306/db_prize_cal 
