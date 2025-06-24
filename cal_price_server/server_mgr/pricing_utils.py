@@ -36,17 +36,17 @@ def match_range(value: float, r: str) -> bool:
     return low < value <= high
 
 
-def calculate_range_fee(value: float, rules: List[Dict[str, Any]]) -> float:
+def calculate_range_fee(value: float, rules: List[Dict[str, Any]]):
     for rule in rules:
         low, high = parse_range(rule['range'])
         if low < value <= high:
             if 'price' in rule:
-                return rule['price']
+                return rule['price'], rule
             if 'unit_price' in rule:
                 base = rule.get('base_fees', 0)
                 v = value - rule.get('deduction_value', 0)
-                return round(base + v * rule['unit_price'], 2)
-    return 0.0
+                return round(base + v * rule['unit_price'], 2), rule
+    return 0.0, None
 
 
 def calculate_surcharge_with_breakdown(
@@ -109,6 +109,8 @@ def calculate_surcharge_with_breakdown(
     if upstairs_cfg:
         match = True
         for k in ['need_go_upstairs', 'has_elevator', 'need_stairs']:
+            if k not in upstairs_cfg:
+                continue
             if context.get(k, -1) != upstairs_cfg.get(k, -1):
                 match = False
                 break
@@ -156,11 +158,12 @@ def calculate_total_price(
 
         # 2. 派送费
         delivery_rules = json.loads(rule.delivery_fee_rules or '[]')
-        w_fee = calculate_range_fee(weight, [r for r in delivery_rules if r['prize_type']=='KG'])
-        v_fee = calculate_range_fee(volume, [r for r in delivery_rules if r['prize_type']=='CBM'])
+        w_fee, w_delivery_rule = calculate_range_fee(weight, [r for r in delivery_rules if r['prize_type']=='KG'])
+        v_fee, v_delivery_rule = calculate_range_fee(volume, [r for r in delivery_rules if r['prize_type']=='CBM'])
         delivery = max(w_fee, v_fee)
+        delivery_rule = w_delivery_rule if w_fee >= v_fee else v_delivery_rule
         details.append(FeeDetail(
-            name='delivery_fee', rule={'rules':delivery_rules}, applied_value=weight, amount=delivery
+            name='delivery_fee', rule={'rules':delivery_rule}, applied_value=weight, amount=delivery
             , cn_name = '派送费'
         ))
 

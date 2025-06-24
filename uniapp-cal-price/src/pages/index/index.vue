@@ -80,31 +80,32 @@
     <button class="submit-button" @click="submit">我要报价</button>
 
     <!-- 报价结果弹窗 -->
-    <uni-popup ref="resultPopup" type="dialog">
+    <uni-popup ref="resultPopup" type="dialog" style="position: absolute;">
       <view class="popup">
         <text class="popup-title">报价结果</text>
         <view v-for="(item, index) in resultList" :key="index" class="quote-item">
           <view class="quote-row">
-            <text>
-              方案{{ index + 1 }}：
-              <text class="price">{{ item.total_price }}</text> 元，
-              渠道：{{ item.channel }}，
-              运输：{{ item.transport_method }}，
-              仓库：{{ item.warehouse }}
-            </text>
+            <view>
+              <text>
+                方案{{ index + 1 }}：
+                <text class="price">{{ item.total_price }}</text> 元，
+                渠道：{{ item.channel }}，
+                运输：{{ item.transport_method }}，
+                仓库：{{ item.warehouse }}
+              </text>
 
-            <button v-if="item.remark" class="remark-btn" @click="showRemark(item.remark)">备注</button>
-            <view class="fee-details">
-              <view v-for="fee in item.fee_details" :key="fee.name" class="fee-row">
-                <text class="fee-name">{{ fee.cn_name }}:</text>
-                <text class="fee-amount">{{ fee.amount }}, </text>
-              </view>
+              <text v-if="item.remark" class="remark-btn" @click="showRemark(item.remark)">备注</text>
+
             </view>
+            <view class="fee-details">
+              <text v-for="fee in item.fee_details" :key="fee.name" class="fee-detail">
+                {{ fee.cn_name }}:{{ fee.amount }}
+              </text>
+            </view>
+
           </view>
-
-
         </view>
-        <button class="popup-button" @click="contactCustomer">联系客服领优惠</button>
+        <!-- <button class="popup-button" @click="contactCustomer">联系客服领优惠</button> -->
       </view>
     </uni-popup>
 
@@ -257,6 +258,8 @@ export default {
   padding: 40rpx;
   background-color: #f4f6f9;
   font-size: 28rpx;
+  min-height: 100vh;
+  overflow-y: auto;
 }
 .label {
   font-weight: bold;
@@ -325,12 +328,13 @@ export default {
   box-sizing: border-box;
 }
 .popup {
-  padding: 40rpx;
+  padding: 5px;
   background: #fff;
   border-radius: 20rpx;
   max-height: 80vh; /* 限制最大高度为屏幕的80% */
   overflow-y: auto; /* 内容超出时显示滚动条 */
   box-sizing: border-box; /* 确保内边距不影响总高度 */
+  margin: 5px;
 }
 .popup-title {
   font-size: 32rpx;
@@ -496,20 +500,35 @@ export default {
   }
 }
 
-.fee-details{
+/* .fee-details {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: space-between;
   margin-top: 20rpx;
   font-size: 28rpx;
+} */
+.fee-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32rpx;
+  margin-top: 12rpx;
+  overflow-x: auto;
 }
-.fee-row {
+
+.fee-detail {
+  color: #888;
+  font-size: 26rpx;
+  white-space: nowrap;   /* 让每项不自动换行，超出则下一项自动换行 */
+}
+
+/* .fee-row {
   font-size: 26rpx;
   margin-top: 2rpx;
-  color: #888; /* 整行灰色 */
+  color: #888; 
   display: flex;
   justify-content: space-between;
-  align-items: center; /* 可选，用于垂直居中 */
-}
+  align-items: center; 
+} */
 
 .fee-name {
   min-width: 160rpx;
@@ -521,4 +540,7 @@ export default {
   margin-left: 32rpx;
 }
 
+html, body {
+  overflow: auto !important;
+}
 </style>
