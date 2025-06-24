@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from db.pricing_rule_db_handle import get_pricing_rule_by_category_id
-from server_mgr.pricing_utils import QuoteRequest, calculate_total_price
+from server_mgr.pricing_utils import QuoteRequest, calculate_total_price, check_if_rule_filter
 from utils.logger_config import logger
 
 router = APIRouter()
@@ -19,6 +19,9 @@ async def get_best_quotes(data: QuoteRequest):
 
         for rule in rules:
             try:
+                if check_if_rule_filter(rule, extra_fee_data):
+                    logger.info(f"Skipping rule {rule.channel} due to filters, {rule.id}")
+                    continue
                 total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, extra_fee_data)
                 if total_price <= 0:
                     continue

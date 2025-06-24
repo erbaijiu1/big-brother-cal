@@ -80,7 +80,7 @@
     <button class="submit-button" @click="submit">我要报价</button>
 
     <!-- 报价结果弹窗 -->
-    <uni-popup ref="resultPopup" type="dialog" style="position: absolute;">
+    <uni-popup ref="resultPopup" type="dialog" class="result-popup">
       <view class="popup">
         <text class="popup-title">报价结果</text>
         <view v-for="(item, index) in resultList" :key="index" class="quote-item">
@@ -110,7 +110,13 @@
     </uni-popup>
 
     <!-- ✅ 弹窗结构建议 -->
-    <uni-popup ref="remarkPopup" type="bottom">
+    <!-- <uni-popup ref="remarkPopup" type="bottom"> -->
+    <uni-popup
+    ref="remarkPopup"
+    type="bottom"
+    :mask-close-able="true"
+    append-to-body
+    >
       <view class="big-remark-popup">
         <view class="close-icon" @click="closeRemark">&#x2715;</view>
         <text class="popup-title">备注信息</text>
@@ -255,7 +261,7 @@ export default {
 
 <style scoped>
 .container {
-  padding: 40rpx;
+  padding: 20rpx;
   background-color: #f4f6f9;
   font-size: 28rpx;
   min-height: 100vh;
@@ -510,7 +516,7 @@ export default {
 .fee-details {
   display: flex;
   flex-wrap: wrap;
-  gap: 32rpx;
+  gap: 15rpx;
   margin-top: 12rpx;
   overflow-x: auto;
 }
@@ -542,5 +548,9 @@ export default {
 
 html, body {
   overflow: auto !important;
+}
+
+.uni-popup{
+  position: relative;
 }
 </style>

@@ -42,6 +42,7 @@ class PricingRule(Base):
     remark = Column(Text, nullable=True, comment="备注")
     compensation_policy = Column(Text, nullable=True, comment="赔付规则")
     status = Column(Integer, default=0, comment='状态, 0:init, 1:ok')
+    filter_rules = Column(Text, nullable=True, default='', comment="过滤规则 JSON，结构包含 filters 列表")
 
     def __repr__(self):
         return f"<PricingRule(category_id={self.category_id}, channel='{self.channel}', transport_method='{self.transport_method}')>"

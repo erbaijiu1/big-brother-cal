@@ -181,3 +181,11 @@ def calculate_total_price(
         logger.error(f"Error in calculate_total_price: {e}", exc_info=True)
         return -1, None, []
 
+
+
+def check_if_rule_filter(rule, context):
+    filter_context = json.loads(rule.filter_rules or '{}')
+    if "sub_districts_in" in filter_context:
+        if context.get('sub_district') in filter_context.get("sub_districts_in", ""):
+            return True
+    return False
