@@ -3,7 +3,7 @@ from db.sqlalchemy_define import get_session_factory
 from utils.logger_config import logger
 
 
-def get_surcharge_config_by_channel( channel: str):
+def get_channel_config_by_channel(channel: str) -> ChannelConfig:
     Session = get_session_factory()
     try:
         with Session() as session:

@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from pydantic import BaseModel, Field
 
-from db.channel_db_handle import get_surcharge_config_by_channel
+from db.channel_db_handle import get_channel_config_by_channel
 from db.db_models import PricingRule
 from utils.logger_config import logger
 
@@ -126,6 +126,31 @@ def calculate_surcharge_with_breakdown(
     return breakdown
 
 
+def get_type_max_fee(price_rules: str, volume: float, weight: float, details: List[FeeDetail], name: str, cn_name: str) -> float:
+    if not price_rules or len(price_rules)<=0 :
+        return 0.0
+
+    # 1. 单价费用
+    unit_rules = json.loads(price_rules)
+    kg_unit_rules = [r for r in unit_rules if r['prize_type'] == 'KG']
+    cbm_unit_rules = [r for r in unit_rules if r['prize_type'] == 'CBM']
+    # 如果没有 CBM 规则，刚CBM转换成KG , 一立方等于143公斤, 向上取整，2位
+    if not cbm_unit_rules:
+        weight = max(round(volume * 143, 2), weight)
+
+    kg_price, w_unit_rule = calculate_range_fee(weight, kg_unit_rules)
+    cbm_price, v_unit_rule = calculate_range_fee(volume, cbm_unit_rules)
+    unit_price = max(kg_price, cbm_price)
+    target_rule, target_unit = (w_unit_rule, weight) if kg_price >= cbm_price else (v_unit_rule, volume)
+    details.append(FeeDetail(
+        name=name, rule={'rules': target_rule}, applied_value=target_unit,
+        amount=unit_price,
+        cn_name=cn_name
+    ))
+
+    return unit_price
+
+
 def calculate_total_price(
     rule: PricingRule,
     weight: float,
@@ -139,38 +164,15 @@ def calculate_total_price(
     details: List[FeeDetail] = []
     try:
         # 1. 单价费用
-        kg = 0.0; cbm = 0.0
-        unit_rules = json.loads(rule.unit_price_rules)
-        target_rule = None
-        for r in unit_rules:
-            low, high = parse_range(r['range'])
-            if r.get('prize_type') == 'KG' and low < weight <= high:
-                kg = r.get('unit_price', 0) * weight
-            if r.get('prize_type') == 'CBM' and low < volume <= high:
-                cbm = r.get('unit_price', 0) * volume
-            if kg == max(kg, cbm):
-                target_rule = r
-        unit_price = max(kg, cbm)
-        details.append(FeeDetail(
-            name='unit_price', rule={'rules':target_rule}, applied_value=weight if kg>=cbm else volume, amount=unit_price,
-            cn_name = '单价费用'
-        ))
+        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, details, 'unit_price', '单价费用')
 
         # 2. 派送费
-        delivery_rules = json.loads(rule.delivery_fee_rules or '[]')
-        w_fee, w_delivery_rule = calculate_range_fee(weight, [r for r in delivery_rules if r['prize_type']=='KG'])
-        v_fee, v_delivery_rule = calculate_range_fee(volume, [r for r in delivery_rules if r['prize_type']=='CBM'])
-        delivery = max(w_fee, v_fee)
-        delivery_rule = w_delivery_rule if w_fee >= v_fee else v_delivery_rule
-        details.append(FeeDetail(
-            name='delivery_fee', rule={'rules':delivery_rule}, applied_value=weight, amount=delivery
-            , cn_name = '派送费'
-        ))
+        delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, details, 'delivery_fee', '派送费')
 
         # 3. 附加费
-        channel_cfg = get_surcharge_config_by_channel(rule.channel)
+        channel_cfg = get_channel_config_by_channel(rule.channel)
         surcharge_raw = json.loads(channel_cfg.surcharge_rules or '{}')
-        surcharge_rules = surcharge_raw.get('surcharges', [])
+        surcharge_rules = surcharge_raw.get('surcharges', {})
         # sea_crossing_fee etc.
         for fee in calculate_surcharge_with_breakdown({**extra_fee_data,'weight':weight,'volume':volume}, surcharge_rules):
             details.append(fee)
@@ -181,11 +183,44 @@ def calculate_total_price(
         logger.error(f"Error in calculate_total_price: {e}", exc_info=True)
         return -1, None, []
 
+def check_if_channel_filter(channel: str, context, weight: float, volume: float) -> bool:
+    channel_config = get_channel_config_by_channel( channel)
+    return check_filter_rule_imp(channel_config.filter_rules, context, weight, volume)
 
+def check_filter_rule_imp(filter_rules:str, context, weight: float, volume: float):
+    filter_config = json.loads(filter_rules or '{}')
+    # 没有过滤条件，直接返回 True 或 False，看你的业务需求
+    if not filter_config:
+        return False
 
-def check_if_rule_filter(rule, context):
-    filter_context = json.loads(rule.filter_rules or '{}')
-    if "sub_districts_in" in filter_context:
-        if context.get('sub_district') in filter_context.get("sub_districts_in", ""):
-            return True
-    return False
+    for key, value in filter_config.items():
+        # 处理“区在列表里”
+        if key == "sub_districts_in":
+            if context.get('sub_district') not in value:
+                return False
+
+        # 处理“重量区间”
+        elif key == "kg_range":
+            low, high = parse_range(filter_config['kg_range'])
+            if weight < low or weight > high:
+                return False
+        # 处理“必须是冷链”
+        # elif key == "need_cold_chain":
+        #     if context.get('need_cold_chain') != value:
+        #         return False
+        # ... 未来你可以加 elif 来处理其他类型的过滤条件
+        # else:
+        #     # 未知字段，按需决定，通常默认跳过或认为不通过
+        #     # return False  # 如果遇到未知过滤字段就直接失败
+        #     pass
+
+    # 所有过滤条件都通过才返回 True
+    return True
+
+def check_if_channel_rule_filter(rule: PricingRule, context, weight, volume):
+    if check_if_channel_filter(rule.channel, context, weight, volume):
+        logger.info(f"Skipping rule {rule.channel} due to filters")
+        return True
+
+    return check_filter_rule_imp(rule.filter_rules, context, weight, volume)
+
