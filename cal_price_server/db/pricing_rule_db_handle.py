@@ -1,3 +1,5 @@
+from typing import List
+
 from db.db_models import PricingRule
 from db.sqlalchemy_define import get_session_factory
 from utils.logger_config import logger
@@ -13,7 +15,7 @@ def get_pricing_rules():
         raise
 
 
-def get_pricing_rule_by_category_id(category_id):
+def get_pricing_rule_by_category_id(category_id)-> List[PricingRule]:
     Session = get_session_factory()
     try:
         with Session() as session:

@@ -5,7 +5,7 @@ from utils.logger_config import logger
 Base = declarative_base()
 
 
-from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index
+from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float
 
 
 class GoodsClassification(Base):
@@ -32,7 +32,7 @@ class PricingRule(Base):
     channel = Column(String(50), nullable=False, comment="渠道，例如'普A'")
     transport_method = Column(String(50), nullable=False, comment="运输方式，例如'陆运'")
     warehouse = Column(String(50), nullable=False, comment="仓库，例如'深圳仓'")
-    min_consumption = Column(String(1024), nullable=True, comment="最低消费")
+    min_consumption = Column(Float, nullable=True, comment="最低消费")
     unit_price_rules = Column(Text, nullable=False, comment="单位价规则（按KG和CBM区间定价）")
     discount_price = Column(String(1024), nullable=True, comment="优惠价（如适用）")
     surcharge_fee_rules = Column(Text, nullable=True, comment="附加费用")

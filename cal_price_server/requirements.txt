@@ -16,3 +16,4 @@ starlette==0.38.2
 typing_extensions==4.12.2
 uvicorn==0.34.3
 wheel==0.45.1
+cryptography==45.0.5

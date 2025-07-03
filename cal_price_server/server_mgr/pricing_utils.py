@@ -45,6 +45,8 @@ def calculate_range_fee(value: float, rules: List[Dict[str, Any]]):
             if 'unit_price' in rule:
                 base = rule.get('base_fees', 0)
                 v = value - rule.get('deduction_value', 0)
+                if v <= 0:
+                    v = 0.0
                 return round(base + v * rule['unit_price'], 2), rule
     return 0.0, None
 

@@ -26,6 +26,9 @@ async def get_best_quotes(data: QuoteRequest):
                 total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, extra_fee_data)
                 if total_price <= 0:
                     continue
+                if total_price < rule.min_consumption:
+                    total_price = rule.min_consumption
+
                 quote_list.append({
                     "channel": rule.channel,
                     "transport_method": rule.transport_method,
