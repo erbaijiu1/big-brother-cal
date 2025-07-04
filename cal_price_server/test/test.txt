@@ -1,4 +1,4 @@
-curl -X POST "localhost:8088/cal_prize/classify/classify_list" -H "Content-Type: application/json" -d '{}'
+curl -X POST "localhost:8088/cal_price/classify/classify_list" -H "Content-Type: application/json" -d '{}'
 
 
 curl -X POST "localhost:8088/cal_prize/pricing_rule/min_pricing" -H "Content-Type: application/json" -d \
