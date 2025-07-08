@@ -6,7 +6,7 @@ def get_classify_list():
     Session = get_session_factory()
     try:
         with Session() as session:
-            result = session.query(GoodsClassification).filter(GoodsClassification.status == 1).all()
+            result = session.query(GoodsClassification).filter(GoodsClassification.status == 1).order_by(GoodsClassification.priority).all()
             return result
     except Exception as e:
         logger.error(f"Error occurred while querying user conversation summary: {e}")

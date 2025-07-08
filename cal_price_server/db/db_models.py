@@ -21,6 +21,7 @@ class GoodsClassification(Base):
     create_time = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))  # 创建时间
     last_modified = Column(DateTime, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))  # 最后修改时间
     status = Column(Integer, default=0, comment='状态, 0:init, 1:ok')
+    priority = Column(Integer, default=99, comment='优先级')
 
 
 
