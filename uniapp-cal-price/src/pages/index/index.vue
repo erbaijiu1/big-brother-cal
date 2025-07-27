@@ -120,7 +120,7 @@
       <view class="popup">
         <text class="popup-title">报价结果</text>
 
-        <view v-for="(item, index) in resultList"
+        <view v-for="(item, index) in resultList.slice(0, 2)"
               :key="index"
               class="quote-card">
 
@@ -131,11 +131,11 @@
           </view>
 
           <!-- 基本信息 -->
-          <view class="quote-base">
+          <!-- <view class="quote-base">
             <text>渠道：{{ item.channel }}</text>
             <text>运输：{{ item.transport_method }}</text>
             <text>仓库：{{ item.warehouse }}</text>
-          </view>
+          </view> -->
 
           <!-- 费用拆分 -->
           <view class="fee-details">
@@ -147,30 +147,14 @@
           </view>
 
           <!-- 计费重量 -->
-          <view class="charge-weight-row">
-            <text>计费单位：{{ calcChargeWeight(item) }} kg</text>
-          </view>
+          <!-- <view class="charge-weight-row">
+            <text>计量：{{ calcChargeWeight(item) }} kg</text>
+          </view> -->
 
-          <!-- 备注按钮 -->
-          <view v-if="item.remark"
-                class="remark-btn"
-                @click="showRemark(item.remark)">
-            备注
+          <!-- 备注直接展示，低调样式 -->
+          <view v-if="item.remark" class="quote-remark">
+            备注：{{ item.remark }}
           </view>
-        </view>
-      </view>
-    </uni-popup>
-
-    <!-- 底部备注弹窗 -->
-    <uni-popup ref="remarkPopup"
-               type="bottom"
-               :mask-close-able="true"
-               append-to-body>
-      <view class="big-remark-popup">
-        <view class="close-icon" @click="closeRemark">&#x2715;</view>
-        <text class="popup-title">备注信息</text>
-        <view class="remark-scroll-view">
-          <view class="remark-content">{{ currentRemark }}</view>
         </view>
       </view>
     </uni-popup>
@@ -208,8 +192,7 @@ export default {
       needStairs: '0',
 
       /********* 结果 *********/
-      resultList: [],
-      currentRemark: ''
+      resultList: []
     }
   },
 
@@ -342,13 +325,7 @@ export default {
       /* demo：使用 fee_details 里 unit_price 的 applied_value 估算 */
       const unitLine = item.fee_details.find(f => f.name === 'unit_price')
       return unitLine ? unitLine.applied_value : '--'
-    },
-
-    showRemark (remark) {
-      this.currentRemark = remark
-      this.$refs.remarkPopup.open()
-    },
-    closeRemark () { this.$refs.remarkPopup.close() }
+    }
   }
 }
 </script>
@@ -367,7 +344,6 @@ export default {
 .label          { font-weight: bold; color: #333; margin-bottom: 12rpx; display: block; }
 .form-item      { margin-bottom: 40rpx; }
 
-/* 输入框 & picker 外观保持一致 */
 .input, .picker-box {
   background: #fff;
   border: 1px solid #ccc;
@@ -382,16 +358,13 @@ export default {
 }
 .picker-box .main-category { font-weight: bold; color: #333; }
 
-/* 字段说明 / 体积重公式 */
 .field-tip        { font-size: 24rpx; color: #999; margin-top: 6rpx; }
 .charge-weight-tip{ font-size: 26rpx; color: #007aff; margin: -24rpx 0 24rpx 0; font-weight: 500; }
 
-/* 分类子描述 */
 .sub-category-desc{
   color: #999; font-size: 24rpx; margin: 8rpx 0 0 6rpx;
 }
 
-/* =============== 地址选择区域 =============== */
 .address-select-wrap{
   display: flex; flex-direction: row; gap: 18rpx; margin-top: 8rpx;
 }
@@ -407,21 +380,9 @@ export default {
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 
-/* 地址选择后，汇总信息块（大区 / 小区 / 是否偏远） */
-.address-summary{
-  margin-top: 12rpx;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 12rpx;
-  padding: 16rpx;
-  line-height: 1.6;
-  font-size: 26rpx;
-  color: #444;
-}
 .remote-tip         { margin-top: 6rpx; font-size: 24rpx; color: #999; }
 .remote-tip.remote  { color: #ff9800; font-weight: bold; }
 
-/* =============== Radio 组 =============== */
 .radio-group{
   display: flex !important; flex-direction: row !important;
   gap: 40rpx; margin-top: 20rpx;
@@ -429,7 +390,6 @@ export default {
 .radio-label{
   display: flex; align-items: center; font-size: 28rpx; color: #333; margin-right: 24rpx;
 }
-/* 缩小单选框 */
 .mini-radio >>> .uni-radio-input,
 .mini-radio >>> .uni-radio-input-checked,
 .mini-radio /deep/ .uni-radio-input,
@@ -437,14 +397,12 @@ export default {
   transform: scale(0.75); margin-right: 10rpx;
 }
 
-/* =============== 提交按钮 =============== */
 .submit-button{
-  background: #007aff; color: #fff; padding: 28rpx;
+  background: #007aff; color: #fff; padding: 2rpx;
   border-radius: 14rpx; font-size: 32rpx; text-align: center;
   margin-top: 20rpx; width: 100%; box-sizing: border-box;
 }
 
-/* =============== 报价弹窗与卡片 =============== */
 .popup{
   padding: 5px; background: #fff; border-radius: 20rpx;
   max-height: 80vh; overflow-y: auto; box-sizing: border-box; margin: 5px;
@@ -454,7 +412,6 @@ export default {
   margin-bottom: 20rpx; color: #222;
 }
 
-/* 结果卡片 */
 .quote-card{
   border: 1px solid #e5e5e5; border-radius: 16rpx;
   padding: 24rpx; margin-bottom: 24rpx;
@@ -474,43 +431,19 @@ export default {
 }
 .fee-item           { white-space: nowrap; }
 .charge-weight-row  { font-size: 26rpx; color: #666; margin-bottom: 10rpx; }
-.remark-btn{
-  align-self: flex-start; font-size: 24rpx; padding: 8rpx 24rpx;
-  background: #f5f7fa; color: #007aff; border: 1px solid #007aff; border-radius: 8rpx;
+
+/* 备注样式：低调浅灰 */
+.quote-remark {
+  margin-top: 6rpx;
+  color: #888;
+  font-size: 22rpx;
+  background: #f6f6f6;
+  border-radius: 8rpx;
+  padding: 10rpx 14rpx;
+  line-height: 1.5;
+  word-break: break-all;
 }
 
-/* =============== 底部备注弹窗 =============== */
-.big-remark-popup{
-  position: relative; width: 92vw; min-height: 40vh; max-height: 75vh;
-  border-top-left-radius: 28rpx; border-top-right-radius: 28rpx;
-  background: #fff; padding: 32rpx 24rpx;
-  display: flex; flex-direction: column; box-sizing: border-box;
-  box-shadow: 0 -10rpx 32rpx rgba(0,0,0,.15); margin: 0 auto; animation: fadeInUp .3s ease;
-}
-.remark-scroll-view{
-  flex: 1; overflow-y: auto; max-height: 60vh;
-  background: #f9f9f9; border-radius: 20rpx;
-  padding: 24rpx; box-sizing: border-box;
-}
-.remark-content{
-  color: #333; font-size: 28rpx; white-space: pre-wrap; word-break: break-all; line-height: 1.8;
-}
-.close-icon{
-  position: absolute; top: 16rpx; right: 16rpx;
-  font-size: 36rpx; color: #aaa; z-index: 10;
-  background: #f0f0f0; border-radius: 50%; width: 48rpx; height: 48rpx;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,.08);
-}
-.close-icon:hover { background: #e0e0e0; }
-
-/* 弹入动画 */
-@keyframes fadeInUp{
-  0% { transform: translateY(100rpx); opacity: 0; }
-  100%{ transform: translateY(0); opacity: 1; }
-}
-
-/* =============== 其它通用 =============== */
 html, body { overflow: auto !important; }
 .uni-popup    { position: relative; }
 </style>

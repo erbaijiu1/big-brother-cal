@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from pydantic import BaseModel, Field
 
+import config
 from db.channel_db_handle import get_channel_config_by_channel
 from db.db_models import PricingRule
 from utils.logger_config import logger
@@ -144,6 +145,13 @@ def get_type_max_fee(price_rules: str, volume: float, weight: float, details: Li
     cbm_price, v_unit_rule = calculate_range_fee(volume, cbm_unit_rules)
     unit_price = max(kg_price, cbm_price)
     target_rule, target_unit = (w_unit_rule, weight) if kg_price >= cbm_price else (v_unit_rule, volume)
+
+    # 增加我们要挣的钱
+    if name in config.EXTRA_FEE_ITEMS:
+        earn_money = max(config.MIN_EARN_MONEY, unit_price * config.EARN_MONEY_RATIO)
+        unit_price = unit_price + earn_money
+
+    # logger.info(f"unit_price: {unit_price}, earn_money: {earn_money}")
     details.append(FeeDetail(
         name=name, rule=target_rule, applied_value=target_unit,
         amount=unit_price,

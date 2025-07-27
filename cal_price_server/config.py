@@ -33,3 +33,11 @@ GLOBAL_LOG_PATH = os.getenv("GLOBAL_LOG_PATH", "./logs/server.log")
 
 # 上下文最大使用的历史记录
 CHAT_HISTORY_MAX_SIZE = os.getenv("CHAT_HISTORY_MAX_SIZE", 10)
+
+
+# 至少挣多少钱
+MIN_EARN_MONEY = os.getenv("MIN_EARN_MONEY", 30)
+# 配置挣取的比例
+EARN_MONEY_RATIO = os.getenv("EARN_MONEY_RATIO", 0.3)
+# 加额外费用的项
+EXTRA_FEE_ITEMS = os.getenv("EXTRA_FEE_ITEMS", "unit_price")
