@@ -103,7 +103,7 @@ def calculate_surcharge_with_breakdown(
             rule=best_rule,
             applied_value=0.0,
             amount=max_price,
-            cn_name = '远程区附加费'
+            cn_name='远程区附加费'
         ))
 
     # 电梯搬运费
@@ -145,7 +145,7 @@ def get_type_max_fee(price_rules: str, volume: float, weight: float, details: Li
     unit_price = max(kg_price, cbm_price)
     target_rule, target_unit = (w_unit_rule, weight) if kg_price >= cbm_price else (v_unit_rule, volume)
     details.append(FeeDetail(
-        name=name, rule={'rules': target_rule}, applied_value=target_unit,
+        name=name, rule=target_rule, applied_value=target_unit,
         amount=unit_price,
         cn_name=cn_name
     ))
