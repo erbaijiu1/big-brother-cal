@@ -158,6 +158,10 @@
         </view>
       </view>
     </uni-popup>
+
+
+    <WechatFab />
+
   </view>
 </template>
 
@@ -165,9 +169,10 @@
 import { BASE_URL } from '@/common/config'
 import hkDistricts from '@/common/hk_districts.json'
 import uniPopup from '@dcloudio/uni-ui/lib/uni-popup/uni-popup.vue'
+import WechatFab from '@/components/WechatFab.vue'
 
 export default {
-  components: { uniPopup },
+  components: { uniPopup, WechatFab },
   data () {
     return {
       /********* 表单 *********/
@@ -338,6 +343,7 @@ export default {
   font-size: 28rpx;
   min-height: 100vh;
   overflow-y: auto;
+  position: relative;
 }
 
 /* =============== 表单标签与行 =============== */
