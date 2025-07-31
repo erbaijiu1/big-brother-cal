@@ -14,20 +14,14 @@
     <!-- 重量 -->
     <view class="form-item">
       <text class="label">重量（kg）</text>
-      <input type="number"
-             v-model.number="weight"
-             placeholder="请输入实重"
-             class="input" />
+      <input type="number" v-model.number="weight" placeholder="请输入实重" class="input" />
       <view class="field-tip">称重所得的真实重量</view>
     </view>
 
     <!-- 体积 -->
     <view class="form-item">
       <text class="label">体积（m³）</text>
-      <input type="number"
-             v-model.number="volume"
-             placeholder="请输入体积（如 0.02）"
-             class="input" />
+      <input type="number" v-model.number="volume" placeholder="请输入体积（如 0.02）" class="input" />
       <view class="field-tip">体积重公式：体积 × 143 ≈ kg</view>
     </view>
 
@@ -41,16 +35,11 @@
         <picker :range="districts" range-key="district_cn" @change="onDistrictChange">
           <view class="select-box">{{ selectedDistrictName || '請選擇行政區' }}</view>
         </picker>
-        <picker :range="subDistricts"
-                range-key="sub_cn"
-                @change="onSubDistrictChange"
-                :disabled="!selectedDistrict">
+        <picker :range="subDistricts" range-key="sub_cn" @change="onSubDistrictChange" :disabled="!selectedDistrict">
           <view class="select-box">{{ selectedSubDistrictName || '請選擇分區／地段' }}</view>
         </picker>
       </view>
-      <view v-if="isRemote !== null"
-            class="remote-tip"
-            :class="{ remote: isRemote }">
+      <view v-if="isRemote !== null" class="remote-tip" :class="{ remote: isRemote }">
         <!-- {{ isRemote ? '该地区为偏远地区 (派送 +¥30)' : '该地区非偏远' }} -->
       </view>
     </view>
@@ -58,18 +47,12 @@
     <!-- 是否需要上楼 -->
     <view class="form-item">
       <text class="label">是否需要上楼</text>
-      <radio-group class="radio-group"
-                   :value="needGoUpstairs"
-                   @change="onNeedGoUpstairsChange">
+      <radio-group class="radio-group" :value="needGoUpstairs" @change="onNeedGoUpstairsChange">
         <label class="radio-label">
-          <radio value="1"
-                 :checked="needGoUpstairs === '1'"
-                 class="mini-radio" /> 是
+          <radio value="1" :checked="needGoUpstairs === '1'" class="mini-radio" /> 是
         </label>
         <label class="radio-label">
-          <radio value="0"
-                 :checked="needGoUpstairs === '0'"
-                 class="mini-radio" /> 否
+          <radio value="0" :checked="needGoUpstairs === '0'" class="mini-radio" /> 否
         </label>
       </radio-group>
     </view>
@@ -78,35 +61,23 @@
     <view v-if="needGoUpstairs === '1'">
       <view class="form-item">
         <text class="label">是否电梯</text>
-        <radio-group class="radio-group"
-                     :value="hasElevator"
-                     @change="e => hasElevator = e.detail.value">
+        <radio-group class="radio-group" :value="hasElevator" @change="e => hasElevator = e.detail.value">
           <label class="radio-label">
-            <radio value="1"
-                   :checked="hasElevator === '1'"
-                   class="mini-radio" /> 有
+            <radio value="1" :checked="hasElevator === '1'" class="mini-radio" /> 有
           </label>
           <label class="radio-label">
-            <radio value="0"
-                   :checked="hasElevator === '0'"
-                   class="mini-radio" /> 无
+            <radio value="0" :checked="hasElevator === '0'" class="mini-radio" /> 无
           </label>
         </radio-group>
       </view>
       <view class="form-item">
         <text class="label">是否搬阶梯</text>
-        <radio-group class="radio-group"
-                     :value="needStairs"
-                     @change="e => needStairs = e.detail.value">
+        <radio-group class="radio-group" :value="needStairs" @change="e => needStairs = e.detail.value">
           <label class="radio-label">
-            <radio value="1"
-                   :checked="needStairs === '1'"
-                   class="mini-radio" /> 是
+            <radio value="1" :checked="needStairs === '1'" class="mini-radio" /> 是
           </label>
           <label class="radio-label">
-            <radio value="0"
-                   :checked="needStairs === '0'"
-                   class="mini-radio" /> 否
+            <radio value="0" :checked="needStairs === '0'" class="mini-radio" /> 否
           </label>
         </radio-group>
       </view>
@@ -120,47 +91,42 @@
       <view class="popup">
         <text class="popup-title">报价结果</text>
 
-        <view v-for="(item, index) in resultList.slice(0, 2)"
-              :key="index"
-              class="quote-card">
+        <!-- ✅ 如果无报价 -->
+        <view v-if="resultList.length === 0" class="quote-empty">
+          当前报价方案未匹配，找客服领解决方案
+        </view>
 
-          <!-- 顶部行：方案 + 总价 -->
-          <view class="quote-head">
-            <text class="plan">方案{{ index + 1 }}</text>
-            <text class="price">{{ item.total_price }} 元</text>
-          </view>
+        <!-- ✅ 如果有报价 -->
+        <view v-else>
+          <view v-for="(item, index) in resultList.slice(0, 2)" :key="index" class="quote-card">
+            <view class="quote-head">
+              <text class="plan">方案{{ index + 1 }}</text>
+              <text class="price">{{ item.total_price }} 元</text>
+            </view>
 
-          <!-- 基本信息 -->
-          <!-- <view class="quote-base">
-            <text>渠道：{{ item.channel }}</text>
-            <text>运输：{{ item.transport_method }}</text>
-            <text>仓库：{{ item.warehouse }}</text>
-          </view> -->
+            <view class="fee-details">
+              <view v-for="fee in item.fee_details" :key="fee.name" class="fee-item">
+                {{ fee.cn_name }}：{{ fee.amount }}
+              </view>
+            </view>
 
-          <!-- 费用拆分 -->
-          <view class="fee-details">
-            <view v-for="fee in item.fee_details"
-                  :key="fee.name"
-                  class="fee-item">
-              {{ fee.cn_name }}：{{ fee.amount }}
+            <view v-if="item.remark" class="quote-remark">
+              备注：{{ item.remark }}
             </view>
           </view>
+        </view>
 
-          <!-- 计费重量 -->
-          <!-- <view class="charge-weight-row">
-            <text>计量：{{ calcChargeWeight(item) }} kg</text>
-          </view> -->
-
-          <!-- 备注直接展示，低调样式 -->
-          <view v-if="item.remark" class="quote-remark">
-            备注：{{ item.remark }}
-          </view>
+        <!-- ✅ 添加按钮 -->
+        <view class="quote-bottom">
+          <button class="wechat-btn" @click="openWechatPopup">
+            找客服领取新客优惠 🎁
+          </button>
         </view>
       </view>
     </uni-popup>
 
 
-    <WechatFab />
+    <WechatFab ref="fab" />
 
   </view>
 </template>
@@ -331,6 +297,11 @@ export default {
       const unitLine = item.fee_details.find(f => f.name === 'unit_price')
       return unitLine ? unitLine.applied_value : '--'
     }
+    , openWechatPopup() {
+        console.log('尝试打开企业微信弹窗', this.$refs.fab)
+
+      this.$refs.fab?.showPopup?.()
+  }
   }
 }
 </script>
@@ -452,4 +423,27 @@ export default {
 
 html, body { overflow: auto !important; }
 .uni-popup    { position: relative; }
+
+.quote-empty {
+  text-align: center;
+  font-size: 26rpx;
+  color: #888;
+  padding: 40rpx 20rpx;
+}
+
+.quote-bottom {
+  margin-top: 32rpx;
+  text-align: center;
+}
+.wechat-btn {
+  background-color: #07C160;
+  color: #fff;
+  font-size: 28rpx;
+  padding: 18rpx 40rpx;
+  border-radius: 12rpx;
+  border: none;
+}
+
+
+
 </style>

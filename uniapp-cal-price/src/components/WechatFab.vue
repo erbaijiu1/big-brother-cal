@@ -23,7 +23,15 @@ export default {
     uniPopup
   },
   methods: {
-    openCorpWx () {
+    /**
+ * 给外部调用用的：弹出二维码弹窗
+ */
+    showPopup() {
+      console.log('[WechatFab] showPopup 被调用')
+      this.$refs.qrPopup?.open?.()
+    },
+
+    openCorpWx() {
       const link = 'https://work.weixin.qq.com/ca/cawcdeae7f79de5a3d'
 
       /* #ifdef APP-PLUS */
@@ -34,7 +42,7 @@ export default {
       if (/micromessenger/i.test(navigator.userAgent)) {
         window.location.href = link
       } else {
-        this.$refs.qrPopup.open()
+        this.showPopup()
       }
       /* #endif */
 
@@ -45,6 +53,7 @@ export default {
       })
       /* #endif */
     }
+
   }
 }
 </script>
