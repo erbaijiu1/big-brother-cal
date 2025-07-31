@@ -4,12 +4,14 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse, Response
 from api.goods_classify import router as classify_router
 from api.pricing_rule_api import router as pricing_rule_router
-import logging
+from api.user_concact import router as contact_router
+from utils.logger_config import logger as logging
 
 app = FastAPI()
 
 app.include_router(classify_router, prefix="/cal_price/classify")
 app.include_router(pricing_rule_router, prefix="/cal_price/pricing_rule")
+app.include_router(contact_router, prefix="/cal_price/contact")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,7 +22,7 @@ app.add_middleware(
 )
 
 # 配置简单的日志记录
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO)
 
 
 # 422异常处理
