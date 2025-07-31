@@ -100,7 +100,10 @@
         <view v-else>
           <view v-for="(item, index) in resultList.slice(0, 2)" :key="index" class="quote-card">
             <view class="quote-head">
-              <text class="plan">方案{{ index + 1 }}</text>
+              <view>
+                <text class="plan">方案{{ index + 1 }}</text>
+                <text class="channel-label">{{ item.channel }}</text>
+              </view>
               <text class="price">{{ item.total_price }} 元</text>
             </view>
 
@@ -408,6 +411,10 @@ export default {
 }
 .fee-item           { white-space: nowrap; }
 .charge-weight-row  { font-size: 26rpx; color: #666; margin-bottom: 10rpx; }
+
+.channel-label{
+  font-size: 26rpx; color: #888; margin-left: 10rpx; 
+}
 
 /* 备注样式：低调浅灰 */
 .quote-remark {
