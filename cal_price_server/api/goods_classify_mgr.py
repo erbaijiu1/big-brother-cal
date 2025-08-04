@@ -4,11 +4,13 @@ from db.db_models import GoodsClassification
 from db.sqlalchemy_define import get_db
 from typing import List, Optional
 
-router = APIRouter(prefix="/admin/goods", tags=["分类管理"])
+router = APIRouter(prefix="/classify_mgr", tags=["分类管理"])
 
 @router.get("/", summary="分类分页列表")
-def list_goods(page: int = 1, page_size: int = 20, keyword: Optional[str] = None, db: Session = Depends(get_db)):
+def list_goods(page: int = 1, page_size: int = 20, keyword: Optional[str] = None, include_deleted: int = 0, db: Session = Depends(get_db)):
     q = db.query(GoodsClassification)
+    if not include_deleted:
+        q = q.filter(GoodsClassification.status != 2)  # 只查未删除
     if keyword:
         q = q.filter(GoodsClassification.main_category.like(f"%{keyword}%"))
     total = q.count()
@@ -69,11 +71,22 @@ def update_goods(id: int, data: dict, db: Session = Depends(get_db)):
     db.commit()
     return {"msg": "ok"}
 
-@router.delete("/{id}", summary="删除分类")
+@router.delete("/{id}", summary="删除分类-软删")
 def delete_goods(id: int, db: Session = Depends(get_db)):
     obj = db.query(GoodsClassification).filter(GoodsClassification.category_id == id).first()
     if not obj:
         raise HTTPException(404, "分类不存在")
-    db.delete(obj)
+    obj.status = 2  # 2=已删除，软删除
     db.commit()
     return {"msg": "deleted"}
+
+@router.post("/recover/{id}", summary="恢复分类")
+def recover_goods(id: int, db: Session = Depends(get_db)):
+    obj = db.query(GoodsClassification).filter(GoodsClassification.category_id == id).first()
+    if not obj:
+        raise HTTPException(404, "分类不存在")
+    if obj.status != 2:
+        return {"msg": "该分类未被删除，无需恢复"}
+    obj.status = 1  # 恢复为正常
+    db.commit()
+    return {"msg": "已恢复该分类"}
