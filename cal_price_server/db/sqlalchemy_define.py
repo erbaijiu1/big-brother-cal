@@ -58,3 +58,15 @@ class DatabaseManager:
 def get_session_factory():
     return sessionmaker(autocommit=False, autoflush=False, bind=DatabaseManager.get_db_engine())
     # return sessionmaker(autocommit=False, autoflush=False, bind=DatabaseManager.get_sqlite_engine())
+
+
+
+def get_db():
+    """FastAPI 依赖注入专用，每次请求自动获取并关闭 session"""
+    db_session = get_session_factory()()
+    try:
+        yield db_session
+    finally:
+        db_session.close()
+
+

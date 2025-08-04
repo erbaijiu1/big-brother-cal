@@ -58,6 +58,7 @@ class ChannelConfig(Base):
     filter_rules = Column(Text, nullable=True, default='', comment="过滤规则 JSON，结构包含 filters 列表")
     # 新增一个备注字段
     remark = Column(Text, nullable=True, default='', comment="备注")
+    delete_flag = Column(Integer, default=0, comment='删除标志，0:未删除，1:已删除')
 
     # add channel_code uniq index
     __table_args__ = (
