@@ -11,7 +11,11 @@
         <button class="mini-btn" @click="resetQuery">重置</button>
 
         <label class="switch-wrap">
-          <switch v-model="query.include_deleted" @change="fetchData" />
+          <!-- <switch v-model="query.include_deleted" @change="fetchData" /> -->
+          <switch 
+  :modelValue="query.include_deleted" 
+  @update:modelValue="val => query.include_deleted = val" 
+  @change="fetchData" />
           <text class="switch-label">显示已删除</text>
         </label>
 
@@ -47,7 +51,7 @@
 
         <view class="action">
           <button v-if="!row.delete_flag" size="mini" plain @click="showEditDialog(row)">编辑</button>
-          <button v-if="!row.delete_flag" size="mini" type="warn" plain @click="handleDelete(row)">删</button>
+          <button v-if="!row.delete_flag" size="mini" type="warn" :plain="true" @click="handleDelete(row)">删</button>
           <button v-if="row.delete_flag" size="mini" type="primary" plain @click="handleRecover(row)">恢</button>
         </view>
       </view>
@@ -182,7 +186,7 @@ function saveChannel() {
     uni.showToast({ title: '表单未初始化', icon: 'none' })
     return
   }
-    console.log("value:", editFormRef.value)
+    // console.log("value:", editFormRef.value)
   editFormRef.value.validate()
     .then(res => {
       // 验证通过
@@ -203,7 +207,7 @@ function saveChannel() {
         })
       } else {
         req = uni.request({
-          url: `${BASE_URL}/cal_price/channel_mgr/`,
+          url: `${BASE_URL}/cal_price/channel_mgr/add`,
           method: 'POST',
           data: editDialog.form,
           success(res) {
@@ -225,8 +229,11 @@ function saveChannel() {
 }
 
 function handleDelete(row) {
-  showModal('确定要删除该渠道吗？', '提示').then(confirm => {
-    if (confirm) {
+  uni.showModal({
+    title: '提示',
+    content: '确定要删除该渠道吗？'
+  }).then(res => {
+    if (res.confirm) {
       uni.request({
         url: `${BASE_URL}/cal_price/channel_mgr/${row.id}`,
         method: 'DELETE',

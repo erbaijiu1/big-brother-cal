@@ -44,7 +44,7 @@ def get_channel(id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "渠道不存在")
     return obj
 
-@router.post("/", summary="新增渠道")
+@router.post("/add", summary="新增渠道")
 def create_channel(data: dict, db: Session = Depends(get_db)):
     obj = ChannelConfig(
         channel_code=data.get("channel_code"),
