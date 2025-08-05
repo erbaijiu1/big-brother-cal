@@ -11,11 +11,9 @@
         <button class="mini-btn" @click="resetQuery">重置</button>
 
         <label class="switch-wrap">
-          <!-- <switch v-model="query.include_deleted" @change="fetchData" /> -->
           <switch 
-  :modelValue="query.include_deleted" 
-  @update:modelValue="val => query.include_deleted = val" 
-  @change="fetchData" />
+            :checked="query.include_deleted"
+            @change="onIncludeDeletedChange" />
           <text class="switch-label">显示已删除</text>
         </label>
 
@@ -262,6 +260,14 @@ onPullDownRefresh(() => {
   fetchData()
   uni.stopPullDownRefresh()
 })
+
+
+function onIncludeDeletedChange(e) {
+  query.include_deleted = !!e.detail.value
+  fetchData()
+}
+
+
 </script>
 
 <style>

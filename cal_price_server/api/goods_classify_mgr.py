@@ -1,13 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db.db_models import GoodsClassification
 from db.sqlalchemy_define import get_db
-from typing import List, Optional
+from typing import Optional
 
 router = APIRouter(prefix="/classify_mgr", tags=["分类管理"])
 
 @router.get("/", summary="分类分页列表")
-def list_goods(page: int = 1, page_size: int = 20, keyword: Optional[str] = None, include_deleted: int = 0, db: Session = Depends(get_db)):
+def list_goods(
+    page: int = 1,
+    page_size: int = 20,
+    keyword: Optional[str] = None,
+    include_deleted: int = 0,  # 0:只查未删 1:查全部
+    db: Session = Depends(get_db)
+):
     q = db.query(GoodsClassification)
     if not include_deleted:
         q = q.filter(GoodsClassification.status != 2)  # 只查未删除
@@ -15,6 +21,7 @@ def list_goods(page: int = 1, page_size: int = 20, keyword: Optional[str] = None
         q = q.filter(GoodsClassification.main_category.like(f"%{keyword}%"))
     total = q.count()
     items = q.order_by(GoodsClassification.priority, GoodsClassification.category_id.desc()).offset((page-1)*page_size).limit(page_size).all()
+
     def serialize(obj):
         return {
             "category_id": obj.category_id,
@@ -47,7 +54,7 @@ def create_goods(data: dict, db: Session = Depends(get_db)):
         temperature_req=data.get("temperature_req"),
         hazard_level=data.get("hazard_level"),
         storage_level=data.get("storage_level"),
-        status=data.get("status", 1),
+        status=data.get("status", 1),  # 默认正常
         priority=data.get("priority", 99)
     )
     db.add(obj)
@@ -66,17 +73,17 @@ def update_goods(id: int, data: dict, db: Session = Depends(get_db)):
     obj.temperature_req = data.get("temperature_req")
     obj.hazard_level = data.get("hazard_level")
     obj.storage_level = data.get("storage_level")
-    obj.status = data.get("status", 1)
-    obj.priority = data.get("priority", 99)
+    obj.status = data.get("status", obj.status)
+    obj.priority = data.get("priority", obj.priority)
     db.commit()
     return {"msg": "ok"}
 
-@router.delete("/{id}", summary="删除分类-软删")
+@router.delete("/{id}", summary="删除分类（软删）")
 def delete_goods(id: int, db: Session = Depends(get_db)):
     obj = db.query(GoodsClassification).filter(GoodsClassification.category_id == id).first()
     if not obj:
         raise HTTPException(404, "分类不存在")
-    obj.status = 2  # 2=已删除，软删除
+    obj.status = 2  # 2=已删除（软删除）
     db.commit()
     return {"msg": "deleted"}
 

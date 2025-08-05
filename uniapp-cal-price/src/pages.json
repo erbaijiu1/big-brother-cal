@@ -18,6 +18,18 @@
 						"navigationBarTitleText": "渠道管理"
 					}
 				}
+				,{
+					"path": "classify_mgr/index",
+					"style": {
+						"navigationBarTitleText": "分类管理"
+					}
+				}
+				,{
+					"path": "pricing_mgr/index",
+					"style": {
+						"navigationBarTitleText": "计费管理"
+					}
+				}
 			]
 		}
 	],
