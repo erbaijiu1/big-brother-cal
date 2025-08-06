@@ -279,6 +279,15 @@ onPullDownRefresh(() => {
   uni.stopPullDownRefresh()
 })
 
+function onShow() {
+  const token = uni.getStorageSync('token')
+  if (!token) {
+    uni.redirectTo({ url: '/pages/login/index' })
+  }
+}
+
+
+
 </script>
 
 <style>

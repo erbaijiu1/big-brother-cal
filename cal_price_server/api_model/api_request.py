@@ -32,3 +32,7 @@ class PricingRuleCreate(PricingRuleBase):
 
 class PricingRuleUpdate(PricingRuleBase):
     pass
+
+class LoginForm(BaseModel):
+    username: str
+    password: str

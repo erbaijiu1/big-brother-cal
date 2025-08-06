@@ -1,31 +1,43 @@
 <template>
   <view class="rule-viewer">
-    <view v-for="(item, idx) in parsedRules" :key="idx" class="rule-item">
-      <text v-if="item.prize">一口价【{{ item.range }}】：{{ item.prize }}元</text>
-      <text v-else-if="item.base_fees && item.deduction_value">
-        首重{{ item.deduction_value }}{{ item.prize_type || '' }}【{{ item.range }}】：{{ item.base_fees }}元，超出{{ item.unit_price }}元/{{ item.prize_type || '单位' }}
-      </text>
-      <text v-else>
-        区间【{{ item.range }}】：{{ item.unit_price }}/{{ item.prize_type || '单位' }}
-      </text>
+    <view class="viewer-table-head">
+      <text class="col-range">区间</text>
+      <text class="col-price">单价</text>
+      <text class="col-type">单位</text>
+      <text class="col-base">基础费</text>
+      <text class="col-deduct">扣减</text>
+      <text class="col-prize">一口价</text>
+    </view>
+    <view v-for="(rule, idx) in rules" :key="idx" class="viewer-row">
+      <text class="col-range">{{ rule.range }}</text>
+      <text class="col-price">{{ rule.unit_price || '-' }}</text>
+      <text class="col-type">{{ rule.prize_type }}</text>
+      <text class="col-base">{{ rule.base_fees || '-' }}</text>
+      <text class="col-deduct">{{ rule.deduction_value || '-' }}</text>
+      <text class="col-prize">{{ rule.prize || '-' }}</text>
     </view>
   </view>
 </template>
 
 <script setup>
-import { computed } from 'vue'
 const props = defineProps({
-  rules: { type: [Array, String], required: true }
-})
-const parsedRules = computed(() => {
-  if (!props.rules) return []
-  try {
-    return typeof props.rules === 'string' ? JSON.parse(props.rules) : props.rules
-  } catch { return [] }
+  rules: { type: Array, default: () => [] }
 })
 </script>
 
 <style scoped>
-.rule-viewer { font-size: 24rpx; color: #444; }
-.rule-item + .rule-item { margin-top: 10rpx; }
+.viewer-table-head,
+.viewer-row {
+  display: flex;
+  align-items: center;
+  font-size: 26rpx;
+  margin-bottom: 8rpx;
+}
+.viewer-table-head { font-weight: bold; background: #f6f8fa; }
+.col-range  { flex: 1 1 160rpx; }
+.col-price  { flex: 1 1 120rpx; text-align: center; }
+.col-type   { flex: 0 0 70rpx; text-align: center; }
+.col-base   { flex: 1 1 100rpx; text-align: center; }
+.col-deduct { flex: 1 1 100rpx; text-align: center; }
+.col-prize  { flex: 1 1 100rpx; text-align: center; }
 </style>

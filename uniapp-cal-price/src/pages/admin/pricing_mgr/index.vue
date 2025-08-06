@@ -38,6 +38,7 @@
       <text class="channel">渠道</text>
       <text class="category">分类</text>
       <text class="method">运输方式</text>
+      <text class="method">费用规则</text>
       <text class="remark">备注</text>
       <text class="status">状态</text>
       <text class="action">操作</text>
@@ -193,7 +194,13 @@ function fetchData() {
       include_deleted: query.include_deleted ? 1 : 0
     },
     success(res) {
-      list.value = res.data.data
+      // 假设接口返回 unit_price_rules 是字符串，要处理为数组
+      list.value = (res.data.data || []).map(item => ({
+        ...item,
+        unit_price_rules: typeof item.unit_price_rules === 'string'
+          ? JSON.parse(item.unit_price_rules || '[]')
+          : (item.unit_price_rules || [])
+      }))
       total.value = res.data.total
     }
   })
@@ -233,7 +240,8 @@ function showEditDialog(row = null) {
       channel: '',
       category_id: 0,
       transport_method: '',
-      remark: ''
+      remark: '',
+      unit_price_rules: []
     }
   }
   editPopup.value.open()
@@ -317,25 +325,111 @@ onPullDownRefresh(() => {
 
 
 <style>
-.container { padding: 24rpx; background: #fafbfc; }
-.search-bar { background: #fff; padding: 20rpx; border-radius: 12rpx; margin-bottom: 20rpx; }
-.btn-group { display: flex; flex-wrap: wrap; align-items: center; gap: 20rpx; margin-top: 20rpx; }
-.switch-wrap { display: flex; align-items: center; gap: 8rpx; }
-.switch-label { font-size: 24rpx; }
-.table-head, .table-row {
-  display: flex; align-items: flex-start; padding: 16rpx 20rpx; font-size: 26rpx;
+.container {
+  padding: 24rpx;
+  background: #fafbfc;
 }
-.table-head { font-weight: 600; background: #f2f3f5; }
-.table-row:not(:last-child) { border-bottom: 1px solid #eeeeee; }
-.id      { flex: 0 0 70px; }
-.channel { flex: 0 0 110px; }
-.category{ flex: 0 0 110px; }
-.method  { flex: 0 0 110px; }
-.remark  { flex: 1 1 auto; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.status  { flex: 0 0 90px; text-align: center; }
-.action  { flex: 0 0 170px; display: flex; flex-wrap: wrap; gap: 12rpx; }
-.pagination { margin: 32rpx 0; text-align: center; }
-.edit-dialog { background: #fff; padding: 24rpx; border-radius: 12rpx; width: 680rpx; }
-.dialog-actions { display: flex; justify-content: flex-end; gap: 24rpx; margin-top: 18rpx; }
-.picker { min-width: 110rpx; padding: 0 8rpx; color: #666; }
+
+.search-bar {
+  background: #fff;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20rpx;
+  margin-top: 20rpx;
+}
+
+.switch-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.switch-label {
+  font-size: 24rpx;
+}
+
+.table-head,
+.table-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 16rpx 20rpx;
+  font-size: 26rpx;
+}
+
+.table-head {
+  font-weight: 600;
+  background: #f2f3f5;
+}
+
+.table-row:not(:last-child) {
+  border-bottom: 1px solid #eeeeee;
+}
+
+.id {
+  flex: 0 0 70px;
+}
+
+.channel {
+  flex: 0 0 110px;
+}
+
+.category {
+  flex: 0 0 110px;
+}
+
+.method {
+  flex: 0 0 110px;
+}
+
+.remark {
+  flex: 1 1 auto;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.status {
+  flex: 0 0 90px;
+  text-align: center;
+}
+
+.action {
+  flex: 0 0 170px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.pagination {
+  margin: 32rpx 0;
+  text-align: center;
+}
+
+.edit-dialog {
+  background: #fff;
+  padding: 24rpx;
+  border-radius: 12rpx;
+  width: 680rpx;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 24rpx;
+  margin-top: 18rpx;
+}
+
+.picker {
+  min-width: 110rpx;
+  padding: 0 8rpx;
+  color: #666;
+}
 </style>

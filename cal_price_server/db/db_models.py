@@ -69,6 +69,14 @@ class ChannelConfig(Base):
     def __repr__(self):
         return f"<ChannelSurchargeConfig(channel_code='{self.channel_code}', channel_name='{self.channel_name}')>"
 
+class AdminUser(Base):
+    __tablename__ = "admin_user"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), unique=True, nullable=False)
+    password = Column(String(100), nullable=False)  # 可以加密
+    nickname = Column(String(50), default="")
+    status = Column(Integer, default=1)  # 1=正常 2=禁用
+
 
 if __name__ == '__main__':
     # 创建数据库连接
