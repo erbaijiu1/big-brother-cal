@@ -38,7 +38,8 @@
       <text class="channel">渠道</text>
       <text class="category">分类</text>
       <text class="method">运输方式</text>
-      <text class="method">费用规则</text>
+      <text class="trans_fee_rules">运输费用</text>
+      <text class="delivery_fee_rules">派送费用</text>
       <text class="remark">备注</text>
       <text class="status">状态</text>
       <text class="action">操作</text>
@@ -51,9 +52,14 @@
         <text class="channel">{{ getChannelName(row.channel) }}</text>
         <text class="category">{{ getCategoryName(row.category_id) }}</text>
         <text class="method">{{ row.transport_method || '-' }}</text>
-        <view class="rules">
+        <view class="trans_fee_rules">
           <RuleViewer :rules="row.unit_price_rules" />
         </view>
+
+        <view class="delivery_fee_rules">
+          <RuleViewer :rules="row.delivery_fee_rules" />
+        </view>
+
         <text class="remark" :title="row.remark">{{ row.remark }}</text>
         <view class="status">
           <uni-tag :text="row.status == 2 ? '已删' : '正常'" :type="row.status == 2 ? 'error' : 'success'" size="mini" />
@@ -242,6 +248,7 @@ function showEditDialog(row = null) {
       transport_method: '',
       remark: '',
       unit_price_rules: []
+      ,delivery_fee_rules:[]
     }
   }
   editPopup.value.open()
@@ -361,7 +368,15 @@ onPullDownRefresh(() => {
   align-items: flex-start;
   padding: 16rpx 20rpx;
   font-size: 26rpx;
+  text-align: left;
+  gap: 10rpx; /* 调整列之间的间距 */
 }
+
+.table-head text,
+.table-row text {
+  padding: 0 10rpx; /* 调整文本的内边距 */
+}
+
 
 .table-head {
   font-weight: 600;
@@ -373,23 +388,29 @@ onPullDownRefresh(() => {
 }
 
 .id {
-  flex: 0 0 70px;
+  flex: 0 0 50px;
 }
 
 .channel {
-  flex: 0 0 110px;
+  flex: 0 0 80px;
 }
 
 .category {
-  flex: 0 0 110px;
+  flex: 0 0 140px;
 }
 
 .method {
-  flex: 0 0 110px;
+  flex: 0 0 70px; /* 不增长、不缩小，基础宽度为100px */
+  min-width: 70px;
+  /* text-alwgn: right; */
+}
+
+.trans_fee_rules, .delivery_fee_rules {
+  flex: 1 1 300px;
 }
 
 .remark {
-  flex: 1 1 auto;
+  flex: 1 1 100px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;

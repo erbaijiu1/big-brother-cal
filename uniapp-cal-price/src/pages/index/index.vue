@@ -22,7 +22,7 @@
     <view class="form-item">
       <text class="label">体积（m³）</text>
       <input type="number" v-model.number="volume" placeholder="请输入体积（如 0.02）" class="input" />
-      <view class="field-tip">体积重公式：体积 × 143 ≈ kg</view>
+      <view class="field-tip">体积重公式：体积 × 200 ≈ kg</view>
     </view>
 
     <!-- 计费重量提示 -->
@@ -171,11 +171,11 @@ export default {
   },
 
   computed: {
-    /* 体积重 ≈ 体积 × 143 */
+    /* 体积重 ≈ 体积 × 200 */
     volumetricWeight () {
       if (!this.volume && this.volume !== 0) return null
       const v = parseFloat(this.volume)
-      return isNaN(v) ? null : +(v * 143).toFixed(2)
+      return isNaN(v) ? null : +(v * 200).toFixed(2)
     },
     chargeWeight () {
       if (this.volumetricWeight === null || this.weight === null) return null

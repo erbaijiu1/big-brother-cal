@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from api.login import jwt_auth
 from api_model.api_request import PricingRuleCreate
 from db.db_models import PricingRule, ChannelConfig, GoodsClassification
 from db.sqlalchemy_define import get_db
@@ -8,9 +9,11 @@ from typing import Optional
 import json
 
 router = APIRouter(prefix="/pricing_mgr", tags=["计费规则管理"])
+# router = APIRouter(prefix="/pricing_mgr", tags=["计费规则管理"]
+#                    , dependencies=[Depends(jwt_auth)])
 
 @router.get("/", summary="计费规则分页列表")
-def list_pricing(
+async def list_pricing(
     page: int = 1, page_size: int = 20,
     channel: Optional[str] = None,
     category_id: Optional[int] = None,

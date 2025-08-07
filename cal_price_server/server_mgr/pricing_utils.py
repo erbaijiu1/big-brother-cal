@@ -137,9 +137,9 @@ def get_type_max_fee(price_rules: str, volume: float, weight: float, details: Li
     unit_rules = json.loads(price_rules)
     kg_unit_rules = [r for r in unit_rules if r['prize_type'] == 'KG']
     cbm_unit_rules = [r for r in unit_rules if r['prize_type'] == 'CBM']
-    # 如果没有 CBM 规则，刚CBM转换成KG , 一立方等于143公斤, 向上取整，2位
+    # 如果没有 CBM 规则，刚CBM转换成KG , 一立方等于200公斤, 向上取整，2位
     if not cbm_unit_rules:
-        weight = max(round(volume * 143, 2), weight)
+        weight = max(round(volume * 200, 2), weight)
 
     kg_price, w_unit_rule = calculate_range_fee(weight, kg_unit_rules)
     cbm_price, v_unit_rule = calculate_range_fee(volume, cbm_unit_rules)
