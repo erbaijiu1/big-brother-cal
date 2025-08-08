@@ -21,7 +21,7 @@
     <!-- 体积 -->
     <view class="form-item">
       <text class="label">体积（m³）</text>
-      <input type="number" v-model.number="volume" placeholder="请输入体积（如 0.02）" class="input" />
+      <input type="number" v-model.number="volume" placeholder="体积先填" class="input" />
       <view class="field-tip">体积重公式：体积 × 200 ≈ kg</view>
     </view>
 
@@ -262,8 +262,8 @@ export default {
       if (!this.selectedCategory) {
         uni.showToast({ title: '请选择分类', icon: 'none' }); return
       }
-      if (this.weight === null || this.volume === null) {
-        uni.showToast({ title: '请填写重量和体积', icon: 'none' }); return
+      if (this.weight === null && this.volume === null) {
+        uni.showToast({ title: '请填写重量或体积', icon: 'none' }); return
       }
 
       const extra = {

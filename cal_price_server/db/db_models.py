@@ -1,11 +1,15 @@
+from datetime import datetime
+
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+
 from db.sqlalchemy_define import DatabaseManager
 from utils.logger_config import logger
 
 Base = declarative_base()
 
 
-from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float
+from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float, Boolean
 
 
 class GoodsClassification(Base):
@@ -76,6 +80,40 @@ class AdminUser(Base):
     password = Column(String(100), nullable=False)  # 可以加密
     nickname = Column(String(50), default="")
     status = Column(Integer, default=1)  # 1=正常 2=禁用
+
+
+class District(Base):
+    __tablename__ = "district"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name_cn = Column(String(32), nullable=False, unique=True)
+    name_en = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SubDistrict(Base):
+    __tablename__ = "sub_district"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    district_id = Column(Integer, nullable=False)
+    name_cn = Column(String(32), nullable=False)
+    name_en = Column(String(64), nullable=False)
+    is_remote = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AreaCategory(Base):
+    __tablename__ = "area_category"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(64), nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AreaCategoryMap(Base):
+    __tablename__ = "area_category_map"
+    category_id = Column(Integer, primary_key=True)
+    sub_district_id = Column(Integer, primary_key=True)
 
 
 if __name__ == '__main__':

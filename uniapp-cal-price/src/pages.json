@@ -30,6 +30,12 @@
 						"navigationBarTitleText": "计费管理"
 					}
 				}
+				,{
+					"path": "district/index",
+					"style": {
+						"navigationBarTitleText": "地区管理"
+					}
+				}
 			]
 		}
 	],

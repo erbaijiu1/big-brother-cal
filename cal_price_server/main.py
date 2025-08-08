@@ -6,7 +6,7 @@ from api.goods_classify import router as classify_router
 from api.pricing_rule_api import router as pricing_rule_router
 from api.user_concact import router as contact_router
 from utils.logger_config import logger as logging
-from api import channel_mgr_api, goods_classify_mgr, pricing_rule_mgr_api
+from api import channel_mgr_api, goods_classify_mgr, pricing_rule_mgr_api, district_mgr, area_category_mgr
 
 app = FastAPI()
 
@@ -16,6 +16,9 @@ app.include_router(contact_router, prefix="/cal_price/contact")
 app.include_router(channel_mgr_api.router, prefix="/cal_price")
 app.include_router(goods_classify_mgr.router, prefix="/cal_price")
 app.include_router(pricing_rule_mgr_api.router, prefix="/cal_price")
+app.include_router(district_mgr.router, prefix="/cal_price")
+app.include_router(area_category_mgr.router, prefix="/cal_price")
+
 
 app.add_middleware(
     CORSMiddleware,
