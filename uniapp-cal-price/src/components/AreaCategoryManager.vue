@@ -5,11 +5,18 @@
       <uni-tr>
         <uni-th width="180">名称</uni-th>
         <uni-th width="100">子区数</uni-th>
-        <uni-th width="200">操作</uni-th>
+        <uni-th>子区（按行政区分组展示）</uni-th>
+        <uni-th width="240">操作</uni-th>
       </uni-tr>
+
       <uni-tr v-for="c in cats" :key="c.id">
-        <uni-td>{{ c.name }}</uni-td>
-        <uni-td>{{ c.sub_ids.length }}</uni-td>
+        <uni-td><text class="cat-name">{{ c.name }}</text></uni-td>
+        <uni-td><text>{{ c.sub_ids.length }}</text></uni-td>
+        <uni-td>
+          <text class="group-text">
+            {{ groupedTextFor(c) || '（未配置子区）' }}
+          </text>
+        </uni-td>
         <uni-td>
           <button size="mini" class="mr-1" @click="openEdit(c)">编辑</button>
           <button size="mini" type="primary" class="mr-1" @click="openBind(c)">配置地区</button>
@@ -64,7 +71,36 @@ import { getDistricts } from '@/api/district'
 
 /* ------------------ 数据 ------------------ */
 const cats    = ref([])     // 类别列表
-const subsAll = ref([])     // 全部子区，带 full 文本
+// 全部子区：包含区名与子区名，便于分组
+// { id, district_id, district_cn, sub_cn, full }
+const subsAll = ref([])
+
+/* 建立 subId -> 详细信息 的映射，O(1) 查询 */
+const subDetailMap = computed(() => {
+  const m = new Map()
+  subsAll.value.forEach(s => m.set(s.id, s))
+  return m
+})
+
+/* 把类别 sub_ids 转为“区（子区…）; 区（子区…）”的字符串 */
+function groupedTextFor (cat) {
+  if (!cat?.sub_ids?.length) return ''
+  // 分组：district_cn -> [sub names]
+  const groups = new Map()
+  cat.sub_ids.forEach(id => {
+    const detail = subDetailMap.value.get(id)
+    if (!detail) return
+    if (!groups.has(detail.district_cn)) groups.set(detail.district_cn, [])
+    groups.get(detail.district_cn).push(detail.sub_cn)
+  })
+  // 字典序可选：让展示稳定
+  const parts = []
+  Array.from(groups.keys()).sort().forEach(dName => {
+    const subs = groups.get(dName).sort()
+    parts.push(`${dName}（${subs.join('、')}）`)
+  })
+  return parts.join('； ')
+}
 
 /* 弹窗 / 抽屉 */
 const editPop = ref(null)
@@ -87,8 +123,7 @@ function openEdit (c) {
 }
 
 function saveCat () {
-  const req = editing.value ? updCat(editing.value, form.value)
-                           : addCat(form.value)
+  const req = editing.value ? updCat(editing.value, form.value) : addCat(form.value)
   req.then(() => {
     uni.showToast({ title: '已保存' })
     editPop.value.close()
@@ -103,8 +138,8 @@ function remove (id) {
 }
 
 /* ------------------ 绑定子区 ------------------ */
-const currentCat = ref(null) // 当前操作的类别对象
-const bindList   = ref([])   // 已选子区
+const currentCat = ref(null)
+const bindList   = ref([])
 const keyword    = ref('')
 
 const filteredUnbind = computed(() => subsAll.value
@@ -113,7 +148,6 @@ const filteredUnbind = computed(() => subsAll.value
 
 function openBind (cat) {
   currentCat.value = cat
-  // 初始化已绑定
   bindList.value = subsAll.value.filter(s => cat.sub_ids.includes(s.id))
   drawer.value.open()
 }
@@ -123,7 +157,8 @@ function unselect (sub) { bindList.value = bindList.value.filter(s => s.id !== s
 
 function saveBind () {
   const ids = bindList.value.map(s => s.id)
-  bindSubs(currentCat.value.id, ids).then(() => {
+  // 后端若要求 Body: { sub_ids: [...] }
+  bindSubs(currentCat.value.id, { sub_ids: ids }).then(() => {
     uni.showToast({ title: '已保存' })
     drawer.value.close()
     fetchCats()
@@ -138,7 +173,13 @@ function fetchCats () {
 function fetchSubs () {
   getDistricts().then(res => {
     subsAll.value = res.data.flatMap(d =>
-      d.subs.map(s => ({ id: s.id, full: `${d.name_cn} · ${s.name_cn}` }))
+      d.subs.map(s => ({
+        id: s.id,
+        district_id: d.id,
+        district_cn: d.name_cn,
+        sub_cn: s.name_cn,
+        full: `${d.name_cn} · ${s.name_cn}`
+      }))
     )
   })
 }
@@ -149,6 +190,17 @@ onMounted(() => { fetchCats(); fetchSubs() })
 <style scoped>
 .page { padding: 24rpx; }
 .add-btn { margin-top: 32rpx; }
+.cat-name { font-weight: 600; }
+
+/* 分组文案 */
+.group-text {
+  display: inline-block;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #374151;
+  line-height: 1.8;
+}
+
 .form { padding: 32rpx; width: 500rpx; }
 .input { border: 1px solid #ccc; border-radius: 8rpx; padding: 16rpx; width: 100%; margin-bottom: 24rpx; }
 .actions { display: flex; justify-content: flex-end; gap: 24rpx; }
