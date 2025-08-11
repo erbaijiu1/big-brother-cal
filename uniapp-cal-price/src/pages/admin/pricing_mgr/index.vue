@@ -1,7 +1,7 @@
 <template>
   <view class="container">
     <!-- █████ 筛选栏 █████ -->
-    <uni-forms :modelValue="query" class="search-bar">
+    <uni-forms :modelValue="query" class="search-bar" label-position="left" :label-width="120">
       <uni-forms-item name="channel" label="渠道">
         <picker :range="channelList" range-key="channel_name" @change="onChannelChange">
           <view class="picker">
@@ -101,7 +101,14 @@
           </uni-forms-item>
 
           <uni-forms-item name="unit_price_rules" label="运费规则">
-            <RuleEditor v-model="editDialog.form.unit_price_rules" />
+            <!-- <RuleEditor v-model="editDialog.form.unit_price_rules" /> -->
+            <RuleEditor v-model="editDialog.form.unit_price_rules" 
+              :channelList="channelList"
+              :categoryList="categoryList"
+              @save="onSaveFromChild"
+              @cancel="closeEditDialog"
+              />
+
           </uni-forms-item>
 
           <uni-forms-item name="remark" label="备注">
@@ -328,6 +335,24 @@ onPullDownRefresh(() => {
   fetchData()
   uni.stopPullDownRefresh()
 })
+
+function onSaveFromChild(payload){
+  // 如果后端要字符串而你没启用 STRINGIFY_JSON，这里也可以转：
+  // payload.unit_price_rules    = JSON.stringify(payload.unit_price_rules || [])
+  // payload.surcharge_fee_rules = JSON.stringify(payload.surcharge_fee_rules || [])
+  // payload.delivery_fee_rules  = JSON.stringify(payload.delivery_fee_rules || [])
+
+  const url = payload.id
+    ? `${BASE_URL}/cal_price/pricing_mgr/${payload.id}`
+    : `${BASE_URL}/cal_price/pricing_mgr/`
+  const method = payload.id ? 'PUT' : 'POST'
+
+  uni.request({ url, method, data: payload, success(){
+    uni.showToast({ title:'保存成功', icon:'success' })
+    closeEditDialog(); fetchData()
+  }})
+}
+
 </script>
 
 
@@ -338,10 +363,9 @@ onPullDownRefresh(() => {
 }
 
 .search-bar {
-  background: #fff;
-  padding: 20rpx;
-  border-radius: 12rpx;
-  margin-bottom: 20rpx;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx 24rpx;      /* 行间/列间距 */
 }
 
 .btn-group {
@@ -452,5 +476,53 @@ onPullDownRefresh(() => {
   min-width: 110rpx;
   padding: 0 8rpx;
   color: #666;
+  display: flex;
+  align-items: center;
+  /* min-height: 60rpx; 可根据实际需要调整高度 */
+  margin-bottom:0rpx !important;
 }
+
+.search-bar .uni-forms-item {
+  width: calc(50% - 12rpx); /* 减去列间距的一半，避免换行 */
+  margin-bottom: 2rpx !important;
+  display: flex;
+  align-items: center;
+}
+
+/* 统一 label 宽度与对齐（覆盖内置样式） */
+.search-bar .uni-forms-item__label {
+  width: 120rpx !important;
+  min-width: 120rpx;
+  justify-content: flex-start;  /* label 靠左 */
+}
+
+/* 内容区占满剩余空间 */
+.search-bar .uni-forms-item__content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* picker/easyinput 统一高度与内边距，视觉更整齐 */
+.search-bar .picker,
+.search-bar .uni-easyinput {
+  width: 100%;
+}
+
+/* 行为按钮占满一行，放在最后 */
+.btn-group {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20rpx;
+  margin-top: 12rpx;
+}
+
+/* 窄屏降级为单列 */
+@media (max-width: 750px) {
+  .search-bar .uni-forms-item {
+    width: 100%;
+  }
+}
+
 </style>

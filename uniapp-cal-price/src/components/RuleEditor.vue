@@ -1,110 +1,242 @@
 <template>
-  <view class="rule-editor">
-    <view class="editor-table-head">
-      <text class="col-range">区间</text>
-      <text class="col-price">单价</text>
-      <text class="col-type">单位</text>
-      <text class="col-base">基础费</text>
-      <text class="col-deduct">扣减</text>
-      <text class="col-prize">一口价</text>
-      <text class="col-action"></text>
-    </view>
-    <view v-for="(rule, idx) in localRules" :key="idx" class="editor-row">
-      <input class="col-range" v-model="rule.range" placeholder="如0-50" />
-      <input class="col-price" v-model="rule.unit_price" type="number" placeholder="单价" />
-      <picker
-        class="col-type"
-        :range="['KG', 'CBM']"
-        :value="['KG', 'CBM'].indexOf(rule.prize_type)"
-        @change="e => rule.prize_type = ['KG', 'CBM'][e.detail.value]"
-      >
-        <view>{{ rule.prize_type || '单位' }}</view>
-      </picker>
-      <input class="col-base" v-model="rule.base_fees" type="number" placeholder="基础费" />
-      <input class="col-deduct" v-model="rule.deduction_value" type="number" placeholder="扣减" />
-      <input class="col-prize" v-model="rule.prize" type="number" placeholder="一口价" />
-      <view class="col-action">
-        <button size="mini" type="warn" plain @click="removeRule(idx)">删</button>
-      </view>
-    </view>
+  <view class="rule-editor-wrap">
+    <uni-forms :modelValue="form" :rules="rules" ref="formRef" label-width="90px">
+      <!-- 基本信息 -->
+      <view class="card">
+        <view class="card-title">基本信息</view>
 
-    <view class="rule-add-row">
-      <button size="mini" type="primary" plain @click="addRule">添加一条规则</button>
-    </view>
-    <view class="rule-save-row">
-      <button size="default" type="success" @click="saveRules">保存规则</button>
+        <uni-forms-item name="channel" label="渠道">
+          <picker :range="channelList" range-key="channel_name" :value="channelIndex" @change="onChannelChange">
+            <view class="picker">{{ channelName || '请选择' }}</view>
+          </picker>
+        </uni-forms-item>
+
+        <uni-forms-item name="category_id" label="分类">
+          <picker :range="categoryList" range-key="main_category" :value="categoryIndex" @change="onCategoryChange">
+            <view class="picker">{{ categoryName || '请选择' }}</view>
+          </picker>
+        </uni-forms-item>
+
+        <uni-forms-item name="transport_method" label="运输方式">
+          <picker :range="transportOptions" :value="transportIndex" @change="e=> form.transport_method = transportOptions[e.detail.value]">
+            <view class="picker">{{ form.transport_method || '请选择' }}</view>
+          </picker>
+        </uni-forms-item>
+
+        <uni-forms-item name="warehouse" label="仓库">
+          <picker :range="warehouseOptions" :value="warehouseIndex" @change="e=> form.warehouse = warehouseOptions[e.detail.value]">
+            <view class="picker">{{ form.warehouse || '请选择' }}</view>
+          </picker>
+        </uni-forms-item>
+
+        <uni-forms-item name="min_consumption" label="最低消费">
+          <uni-easyinput type="number" v-model="form.min_consumption" placeholder="0 表示不限制" />
+        </uni-forms-item>
+
+        <uni-forms-item name="status" label="状态">
+          <picker :range="statusOptions" range-key="label" :value="statusIndex" @change="onStatusChange">
+            <view class="picker">{{ statusLabel }}</view>
+          </picker>
+        </uni-forms-item>
+      </view>
+
+      <!-- 费用配置 -->
+      <view class="card">
+        <view class="card-title">运费（按 KG/CBM）</view>
+        <RuleFeeEditor v-model="form.unit_price_rules" />
+      </view>
+
+      <view class="card">
+        <view class="card-title">过港费（可选）</view>
+        <RuleFeeEditor v-model="form.surcharge_fee_rules" />
+      </view>
+
+      <view class="card">
+        <view class="card-title">派送费（可选）</view>
+        <RuleFeeEditor v-model="form.delivery_fee_rules" />
+      </view>
+
+      <!-- 其他信息 -->
+      <view class="card">
+        <view class="card-title">其他</view>
+
+        <uni-forms-item name="discount_price" label="优惠价">
+          <uni-easyinput v-model="form.discount_price" placeholder="可留空；结构自定(如满减、折扣等)" />
+        </uni-forms-item>
+
+        <uni-forms-item name="delivery_time" label="交货时效">
+          <uni-easyinput v-model="form.delivery_time" placeholder="例如：2-3个工作日" />
+        </uni-forms-item>
+
+        <uni-forms-item name="packaging_requirement" label="包装要求">
+          <uni-easyinput v-model="form.packaging_requirement" placeholder="例如：冷链、加固等" />
+        </uni-forms-item>
+
+        <uni-forms-item name="compensation_policy" label="赔付规则">
+          <uni-easyinput v-model="form.compensation_policy" type="textarea" placeholder="如破损/丢失的赔付说明" />
+        </uni-forms-item>
+
+        <uni-forms-item name="filter_rules" label="过滤规则">
+          <uni-easyinput v-model="form.filter_rules" type="textarea" placeholder="禁运品、尺寸限制等（JSON或文本）" />
+        </uni-forms-item>
+
+        <uni-forms-item name="remark" label="备注">
+          <uni-easyinput v-model="form.remark" type="textarea" placeholder="备注信息" />
+        </uni-forms-item>
+      </view>
+    </uni-forms>
+
+    <view class="actions">
+      <button @click="$emit('cancel')">取消</button>
+      <button type="primary" @click="handleSave">保存</button>
     </view>
   </view>
 </template>
 
 <script setup>
-import { reactive, watch, toRefs } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import RuleFeeEditor from '@/components/RuleFeeEditor.vue'
 
+/** === 可配置项 === */
+const STRINGIFY_JSON = false   // 若后端要求存字符串，改为 true
+const transportOptions = ['陆运','空运','海运','快递','其他']
+const warehouseOptions = ['深圳仓','广州仓','东莞仓','香港仓','其他']
+const statusOptions = [{value:0,label:'初始化'},{value:1,label:'启用'},{value:2,label:'停用'}]
+
+/** === Props / Emits === */
 const props = defineProps({
-  modelValue: { type: Array, default: () => [] }
+  modelValue: {                    // 对应 t_pricing_rule 的一条记录
+    type: Object,
+    default: () => ({
+      id: null,
+      category_id: 0,
+      channel: '',
+      transport_method: '',
+      warehouse: '',
+      min_consumption: 0,
+      unit_price_rules: [],
+      discount_price: '',
+      surcharge_fee_rules: [],
+      delivery_fee_rules: [],
+      delivery_time: '',
+      packaging_requirement: '',
+      remark: '',
+      compensation_policy: '',
+      status: 1,
+      filter_rules: ''
+    })
+  },
+  channelList: { type: Array, default: () => [] },   // [{channel_code, channel_name}]
+  categoryList: { type: Array, default: () => [] }   // [{category_id, main_category}]
 })
-const emits = defineEmits(['update:modelValue', 'save'])
+const emit = defineEmits(['update:modelValue','save','cancel'])
 
-const localRules = reactive(
-  (Array.isArray(props.modelValue) ? JSON.parse(JSON.stringify(props.modelValue)) : [])
-)
+/** === 本地表单副本 === */
+const form = reactive(normalizeIn(props.modelValue))
+const formRef = ref(null)
 
-watch(
-  () => props.modelValue,
-  (val) => {
-    // 保持与外部同步
-    if (JSON.stringify(val) !== JSON.stringify(localRules)) {
-      localRules.splice(0, localRules.length, ...(val || []))
-    }
-  }
-)
+/** 外部变更时同步 */
+watch(() => props.modelValue, v => Object.assign(form, normalizeIn(v || {})), { deep:true })
 
-function addRule() {
-  localRules.push({
-    range: '',
-    unit_price: '',
-    prize_type: 'KG',
-    base_fees: '',
-    deduction_value: '',
-    prize: ''
+/** === 选择器索引与标签 === */
+const channelIndex = computed(() =>
+  Math.max(0, props.channelList.findIndex(x => x.channel_code === form.channel)))
+const channelName = computed(() =>
+  props.channelList.find(x => x.channel_code === form.channel)?.channel_name || '')
+
+const categoryIndex = computed(() =>
+  Math.max(0, props.categoryList.findIndex(x => Number(x.category_id) === Number(form.category_id))))
+const categoryName = computed(() =>
+  props.categoryList.find(x => Number(x.category_id) === Number(form.category_id))?.main_category || '')
+
+const transportIndex = computed(() => Math.max(0, transportOptions.findIndex(x => x === form.transport_method)))
+const warehouseIndex = computed(() => Math.max(0, warehouseOptions.findIndex(x => x === form.warehouse)))
+const statusIndex = computed(() => Math.max(0, statusOptions.findIndex(x => x.value === Number(form.status))))
+const statusLabel = computed(() => statusOptions[statusIndex.value]?.label || '初始化')
+
+function onChannelChange(e){
+  form.channel = props.channelList[e.detail.value]?.channel_code || ''
+}
+function onCategoryChange(e){
+  form.category_id = props.categoryList[e.detail.value]?.category_id || 0
+}
+function onStatusChange(e){
+  form.status = statusOptions[e.detail.value]?.value ?? 1
+}
+
+/** === 校验规则 === */
+const rules = {
+  channel: [{ required:true, errorMessage:'请选择渠道' }],
+  category_id: [{ required:true, errorMessage:'请选择分类' }],
+  transport_method: [{ required:true, errorMessage:'请选择运输方式' }],
+  warehouse: [{ required:true, errorMessage:'请选择仓库' }],
+  unit_price_rules: [{ validateFunction:(_,v)=> Array.isArray(v) && v.length>0, errorMessage:'请配置运费规则' }]
+}
+
+/** === 保存 === */
+function handleSave(){
+  formRef.value?.validate?.()?.then(()=>{
+    const payload = normalizeOut(form)
+    emit('update:modelValue', payload)
+    emit('save', payload)
+  }).catch(()=> {
+    uni.showToast({ title:'请检查表单', icon:'none' })
   })
 }
-function removeRule(idx) {
-  localRules.splice(idx, 1)
-}
-function saveRules() {
-  // 简单校验
-  for (let r of localRules) {
-    if (!r.range || !r.prize_type) {
-      uni.showToast({ title: '请填写完整区间和单位', icon: 'none' })
-      return
-    }
+
+/** === 规范化 in/out（数组或字符串均可兼容） === */
+function arr(val){
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') {
+    try { const a = JSON.parse(val); return Array.isArray(a) ? a : [] } catch { return [] }
   }
-  emits('update:modelValue', JSON.parse(JSON.stringify(localRules)))
-  emits('save', JSON.parse(JSON.stringify(localRules)))
-  uni.showToast({ title: '规则已保存', icon: 'success' })
+  return []
+}
+function normalizeIn(src){
+  return {
+    id: src?.id ?? null,
+    category_id: Number(src?.category_id ?? 0),
+    channel: src?.channel ?? '',
+    transport_method: src?.transport_method ?? '',
+    warehouse: src?.warehouse ?? '',
+    min_consumption: Number(src?.min_consumption ?? 0),
+    unit_price_rules: arr(src?.unit_price_rules),
+    discount_price: src?.discount_price ?? '',
+    surcharge_fee_rules: arr(src?.surcharge_fee_rules),
+    delivery_fee_rules: arr(src?.delivery_fee_rules),
+    delivery_time: src?.delivery_time ?? '',
+    packaging_requirement: src?.packaging_requirement ?? '',
+    remark: src?.remark ?? '',
+    compensation_policy: src?.compensation_policy ?? '',
+    status: Number(src?.status ?? 1),
+    filter_rules: src?.filter_rules ?? ''
+  }
+}
+function normalizeOut(src){
+  const out = { ...src }
+  // 三个规则字段：按需求选择数组 or 字符串
+  if (STRINGIFY_JSON) {
+    out.unit_price_rules     = JSON.stringify(arr(src.unit_price_rules))
+    out.surcharge_fee_rules  = JSON.stringify(arr(src.surcharge_fee_rules))
+    out.delivery_fee_rules   = JSON.stringify(arr(src.delivery_fee_rules))
+  } else {
+    out.unit_price_rules     = arr(src.unit_price_rules)
+    out.surcharge_fee_rules  = arr(src.surcharge_fee_rules)
+    out.delivery_fee_rules   = arr(src.delivery_fee_rules)
+  }
+  // 数字字段规范
+  out.min_consumption = Number(src.min_consumption || 0)
+  out.status = Number(src.status || 1)
+  return out
 }
 </script>
 
 <style scoped>
-.editor-table-head,
-.editor-row {
-  display: flex;
-  align-items: center;
-  font-size: 26rpx;
-  margin-bottom: 8rpx;
-}
-.editor-table-head { font-weight: bold; background: #f6f8fa; }
-.col-range  { flex: 1 1 160rpx; }
-.col-price  { flex: 1 1 120rpx; text-align: center; }
-.col-type   { flex: 0 0 70rpx; text-align: center; }
-.col-base   { flex: 1 1 100rpx; text-align: center; }
-.col-deduct { flex: 1 1 100rpx; text-align: center; }
-.col-prize  { flex: 1 1 100rpx; text-align: center; }
-.col-action { flex: 0 0 56rpx; text-align: right; }
-.rule-add-row { text-align: left; margin: 16rpx 0 8rpx 0; }
-.rule-save-row { text-align: right; margin: 16rpx 0 8rpx 0; }
-input { border: 1px solid #eee; border-radius: 6rpx; padding: 4rpx 10rpx; font-size: 26rpx; background: #fff; width: 90%; }
-.picker { border: 1px solid #eee; border-radius: 6rpx; background: #fafbfc; padding: 4rpx 0; text-align: center; }
-button { margin-left: 4rpx; }
+.rule-editor-wrap{ padding: 12rpx; }
+.card{ background:#fff; border:1px solid #eee; border-radius:12rpx; padding:16rpx; margin-bottom:16rpx; }
+.card-title{ font-weight:600; margin-bottom:12rpx; color:#333; }
+
+.picker{ min-width: 160rpx; padding: 8rpx 12rpx; background:#fff; border:1px solid #ddd; border-radius:10rpx; color:#666; }
+
+.actions{ display:flex; justify-content:flex-end; gap:16rpx; margin-top:12rpx; }
 </style>
