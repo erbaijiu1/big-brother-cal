@@ -40,20 +40,87 @@
         </uni-forms-item>
       </view>
 
-      <!-- 费用配置 -->
+      <!-- 运费（展示/编辑双态） -->
       <view class="card">
-        <view class="card-title">运费（按 KG/CBM）</view>
-        <RuleFeeEditor v-model="form.unit_price_rules" />
+        <view class="card-head">
+          <view class="card-title">运费（按 KG/CBM）</view>
+          <button size="mini" @click="toggleEdit('unit')">{{ isEditing.unit ? '返回' : '编辑' }}</button>
+        </view>
+
+        <!-- 展示态 -->
+        <view v-if="!isEditing.unit" class="summary">
+          <template v-if="hasRules(form.unit_price_rules)">
+            <view v-for="(line,idx) in rulesToLines(form.unit_price_rules)" :key="'unit-line-'+idx" class="summary-line">
+              <text class="chip">{{ line.unit }}</text>
+              <text class="text">{{ line.text }}</text>
+            </view>
+          </template>
+          <view v-else class="empty">暂无规则，点击右上角“编辑”添加</view>
+        </view>
+
+        <!-- 编辑态 -->
+        <view v-else>
+          <RuleFeeEditor
+            :key="`unit-${form.id ?? 'new'}`"
+            v-model="form.unit_price_rules"
+            dense
+            @save="onSectionSaved('unit', $event)"
+          />
+        </view>
       </view>
 
+      <!-- 过港费（展示/编辑双态） -->
       <view class="card">
-        <view class="card-title">过港费（可选）</view>
-        <RuleFeeEditor v-model="form.surcharge_fee_rules" />
+        <view class="card-head">
+          <view class="card-title">过港费（可选）</view>
+          <button size="mini" @click="toggleEdit('surcharge')">{{ isEditing.surcharge ? '返回' : '编辑' }}</button>
+        </view>
+
+        <view v-if="!isEditing.surcharge" class="summary">
+          <template v-if="hasRules(form.surcharge_fee_rules)">
+            <view v-for="(line,idx) in rulesToLines(form.surcharge_fee_rules)" :key="'surcharge-line-'+idx" class="summary-line">
+              <text class="chip">{{ line.unit }}</text>
+              <text class="text">{{ line.text }}</text>
+            </view>
+          </template>
+          <view v-else class="empty">暂无规则，点击右上角“编辑”添加</view>
+        </view>
+
+        <view v-else>
+          <RuleFeeEditor
+            :key="`surcharge-${form.id ?? 'new'}`"
+            v-model="form.surcharge_fee_rules"
+            dense
+            @save="onSectionSaved('surcharge', $event)"
+          />
+        </view>
       </view>
 
+      <!-- 派送费（展示/编辑双态） -->
       <view class="card">
-        <view class="card-title">派送费（可选）</view>
-        <RuleFeeEditor v-model="form.delivery_fee_rules" />
+        <view class="card-head">
+          <view class="card-title">派送费（可选）</view>
+          <button size="mini" @click="toggleEdit('delivery')">{{ isEditing.delivery ? '返回' : '编辑' }}</button>
+        </view>
+
+        <view v-if="!isEditing.delivery" class="summary">
+          <template v-if="hasRules(form.delivery_fee_rules)">
+            <view v-for="(line,idx) in rulesToLines(form.delivery_fee_rules)" :key="'delivery-line-'+idx" class="summary-line">
+              <text class="chip">{{ line.unit }}</text>
+              <text class="text">{{ line.text }}</text>
+            </view>
+          </template>
+          <view v-else class="empty">暂无规则，点击右上角“编辑”添加</view>
+        </view>
+
+        <view v-else>
+          <RuleFeeEditor
+            :key="`delivery-${form.id ?? 'new'}`"
+            v-model="form.delivery_fee_rules"
+            dense
+            @save="onSectionSaved('delivery', $event)"
+          />
+        </view>
       </view>
 
       <!-- 其他信息 -->
@@ -98,36 +165,25 @@ import { computed, reactive, ref, watch } from 'vue'
 import RuleFeeEditor from '@/components/RuleFeeEditor.vue'
 
 /** === 可配置项 === */
-const STRINGIFY_JSON = false   // 若后端要求存字符串，改为 true
+const STRINGIFY_JSON = false
 const transportOptions = ['陆运','空运','海运','快递','其他']
 const warehouseOptions = ['深圳仓','广州仓','东莞仓','香港仓','其他']
 const statusOptions = [{value:0,label:'初始化'},{value:1,label:'启用'},{value:2,label:'停用'}]
 
 /** === Props / Emits === */
 const props = defineProps({
-  modelValue: {                    // 对应 t_pricing_rule 的一条记录
+  modelValue: {
     type: Object,
     default: () => ({
-      id: null,
-      category_id: 0,
-      channel: '',
-      transport_method: '',
-      warehouse: '',
-      min_consumption: 0,
-      unit_price_rules: [],
-      discount_price: '',
-      surcharge_fee_rules: [],
-      delivery_fee_rules: [],
-      delivery_time: '',
-      packaging_requirement: '',
-      remark: '',
-      compensation_policy: '',
-      status: 1,
-      filter_rules: ''
+      id: null, category_id: 0, channel: '',
+      transport_method: '', warehouse: '', min_consumption: 0,
+      unit_price_rules: [], surcharge_fee_rules: [], delivery_fee_rules: [],
+      discount_price:'', delivery_time:'', packaging_requirement:'',
+      remark:'', compensation_policy:'', status: 1, filter_rules:''
     })
   },
-  channelList: { type: Array, default: () => [] },   // [{channel_code, channel_name}]
-  categoryList: { type: Array, default: () => [] }   // [{category_id, main_category}]
+  channelList: { type: Array, default: () => [] },
+  categoryList: { type: Array, default: () => [] }
 })
 const emit = defineEmits(['update:modelValue','save','cancel'])
 
@@ -135,14 +191,37 @@ const emit = defineEmits(['update:modelValue','save','cancel'])
 const form = reactive(normalizeIn(props.modelValue))
 const formRef = ref(null)
 
+/** 编辑态开关 */
+const isEditing = reactive({
+  unit: false,
+  surcharge: false,
+  delivery: false
+})
+function toggleEdit(key){ isEditing[key] = !isEditing[key] }
+function onSectionSaved(key, payload){
+  // 子组件校验通过，会把最新规则回传；我们更新本地值并回到展示态
+  form[ sectionMap[key] ] = payload || []
+  isEditing[key] = false
+}
+const sectionMap = { unit: 'unit_price_rules', surcharge: 'surcharge_fee_rules', delivery: 'delivery_fee_rules' }
+
 /** 外部变更时同步 */
 watch(() => props.modelValue, v => Object.assign(form, normalizeIn(v || {})), { deep:true })
 
-/** === 选择器索引与标签 === */
-const channelIndex = computed(() =>
-  Math.max(0, props.channelList.findIndex(x => x.channel_code === form.channel)))
-const channelName = computed(() =>
-  props.channelList.find(x => x.channel_code === form.channel)?.channel_name || '')
+/** 选择器索引与标签（渠道名/码兼容） */
+const channelIndex = computed(() => {
+  const list = props.channelList || []
+  const idx = list.findIndex(x =>
+    String(x.channel_code) === String(form.channel) || String(x.channel_name) === String(form.channel)
+  )
+  return idx >= 0 ? idx : 0
+})
+const channelName = computed(() => {
+  const hit = (props.channelList || []).find(x =>
+    String(x.channel_code) === String(form.channel) || String(x.channel_name) === String(form.channel)
+  )
+  return hit?.channel_name || ''
+})
 
 const categoryIndex = computed(() =>
   Math.max(0, props.categoryList.findIndex(x => Number(x.category_id) === Number(form.category_id))))
@@ -154,17 +233,11 @@ const warehouseIndex = computed(() => Math.max(0, warehouseOptions.findIndex(x =
 const statusIndex = computed(() => Math.max(0, statusOptions.findIndex(x => x.value === Number(form.status))))
 const statusLabel = computed(() => statusOptions[statusIndex.value]?.label || '初始化')
 
-function onChannelChange(e){
-  form.channel = props.channelList[e.detail.value]?.channel_code || ''
-}
-function onCategoryChange(e){
-  form.category_id = props.categoryList[e.detail.value]?.category_id || 0
-}
-function onStatusChange(e){
-  form.status = statusOptions[e.detail.value]?.value ?? 1
-}
+function onChannelChange(e){ form.channel = props.channelList[e.detail.value]?.channel_code || '' }
+function onCategoryChange(e){ form.category_id = props.categoryList[e.detail.value]?.category_id || 0 }
+function onStatusChange(e){ form.status = statusOptions[e.detail.value]?.value ?? 1 }
 
-/** === 校验规则 === */
+/** 校验 */
 const rules = {
   channel: [{ required:true, errorMessage:'请选择渠道' }],
   category_id: [{ required:true, errorMessage:'请选择分类' }],
@@ -173,37 +246,33 @@ const rules = {
   unit_price_rules: [{ validateFunction:(_,v)=> Array.isArray(v) && v.length>0, errorMessage:'请配置运费规则' }]
 }
 
-/** === 保存 === */
+/** 保存 */
 function handleSave(){
   formRef.value?.validate?.()?.then(()=>{
     const payload = normalizeOut(form)
     emit('update:modelValue', payload)
     emit('save', payload)
-  }).catch(()=> {
-    uni.showToast({ title:'请检查表单', icon:'none' })
-  })
+  }).catch(()=> uni.showToast({ title:'请检查表单', icon:'none' }))
 }
 
-/** === 规范化 in/out（数组或字符串均可兼容） === */
+/** === 规范化 in/out === */
 function arr(val){
   if (Array.isArray(val)) return val
-  if (typeof val === 'string') {
-    try { const a = JSON.parse(val); return Array.isArray(a) ? a : [] } catch { return [] }
-  }
+  if (typeof val === 'string') { try { const a = JSON.parse(val); return Array.isArray(a) ? a : [] } catch { return [] } }
   return []
 }
 function normalizeIn(src){
   return {
     id: src?.id ?? null,
     category_id: Number(src?.category_id ?? 0),
-    channel: src?.channel ?? '',
+    channel: src?.channel !== undefined && src?.channel !== null ? String(src.channel) : '',
     transport_method: src?.transport_method ?? '',
     warehouse: src?.warehouse ?? '',
     min_consumption: Number(src?.min_consumption ?? 0),
     unit_price_rules: arr(src?.unit_price_rules),
-    discount_price: src?.discount_price ?? '',
     surcharge_fee_rules: arr(src?.surcharge_fee_rules),
     delivery_fee_rules: arr(src?.delivery_fee_rules),
+    discount_price: src?.discount_price ?? '',
     delivery_time: src?.delivery_time ?? '',
     packaging_requirement: src?.packaging_requirement ?? '',
     remark: src?.remark ?? '',
@@ -214,7 +283,6 @@ function normalizeIn(src){
 }
 function normalizeOut(src){
   const out = { ...src }
-  // 三个规则字段：按需求选择数组 or 字符串
   if (STRINGIFY_JSON) {
     out.unit_price_rules     = JSON.stringify(arr(src.unit_price_rules))
     out.surcharge_fee_rules  = JSON.stringify(arr(src.surcharge_fee_rules))
@@ -224,19 +292,76 @@ function normalizeOut(src){
     out.surcharge_fee_rules  = arr(src.surcharge_fee_rules)
     out.delivery_fee_rules   = arr(src.delivery_fee_rules)
   }
-  // 数字字段规范
   out.min_consumption = Number(src.min_consumption || 0)
   out.status = Number(src.status || 1)
+  return out
+}
+function hasRules(a){ return Array.isArray(a) && a.length>0 }
+
+/** === 展示态：把规则转为可读的一行摘要 === */
+function rulesToLines(list = []){
+  // 分组：KG / CBM
+  const groups = { KG: [], CBM: [] }
+  ;(list || []).forEach(r=>{
+    const unit = String(r.prize_type || r.unit || 'KG').toUpperCase().includes('CBM') ? 'CBM' : 'KG'
+    if (r.prize !== undefined && r.prize !== null && r.prize !== '') {
+      groups[unit].push({ type:'flat', prize: r.prize })
+    } else {
+      groups[unit].push({
+        type:'tier',
+        range: r.range || '',
+        unit_price: r.unit_price ?? r.price,
+        base_fees: r.base_fees ?? r.base_fee,
+        deduction_value: r.deduction_value ?? r.deduct
+      })
+    }
+  })
+
+  const out = []
+  ;(['KG','CBM']).forEach(u=>{
+    const arr = groups[u]
+    if (!arr.length) return
+    // 若有 flat，直接显示
+    const flat = arr.find(x=>x.type==='flat')
+    if (flat) {
+      out.push({ unit: u, text: `单价：${flat.prize}` })
+      return
+    }
+    // tier 拼成：0-300:5，300-500:4.5，500-∞:4（附带基础费/扣减简写）
+    const segs = arr
+      .filter(x=>x.type==='tier')
+      .map(x=>{
+        const extras = []
+        if (x.base_fees !== undefined && x.base_fees !== '') extras.push(`基 ${x.base_fees}`)
+        if (x.deduction_value !== undefined && x.deduction_value !== '') extras.push(`扣 ${x.deduction_value}`)
+        return `${x.range}:${x.unit_price}${extras.length?`（${extras.join('，')}）`:''}`
+      })
+    out.push({ unit: u, text: segs.join('， ') })
+  })
   return out
 }
 </script>
 
 <style scoped>
-.rule-editor-wrap{ padding: 12rpx; }
+.rule-editor-wrap{ padding: 8rpx 12rpx; }
+
+/* 卡片 */
 .card{ background:#fff; border:1px solid #eee; border-radius:12rpx; padding:16rpx; margin-bottom:16rpx; }
-.card-title{ font-weight:600; margin-bottom:12rpx; color:#333; }
+.card-title{ font-weight:600; color:#333; margin-bottom:12rpx; }
+.card-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12rpx; }
+.card-head .card-title{ margin:0; }
 
+/* 展示态 */
+.summary{ display:flex; flex-direction:column; gap:10rpx; }
+.summary-line{ display:flex; align-items:flex-start; gap:10rpx; line-height:1.6; }
+.chip{
+  background:#eff4ff; color:#1f6feb; border-radius:999px;
+  padding:4rpx 10rpx; font-size:24rpx; flex:0 0 auto;
+}
+.text{ color:#333; }
+.empty{ color:#999; }
+
+/* 通用控件 */
 .picker{ min-width: 160rpx; padding: 8rpx 12rpx; background:#fff; border:1px solid #ddd; border-radius:10rpx; color:#666; }
-
 .actions{ display:flex; justify-content:flex-end; gap:16rpx; margin-top:12rpx; }
 </style>
