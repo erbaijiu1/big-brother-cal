@@ -40,7 +40,7 @@ async def get_best_quotes(data: QuoteRequest):
                 })
                 logger.info(f"Quote for channel {rule.channel} is {total_price}")
             except Exception as e:
-                logger.error(f"Failed to calculate quote for channel {rule.channel}: {e}", exc_info=True)
+                logger.error(f"Failed to calculate quote for channel {rule.channel}, rule_id:{rule.id}: {e}", exc_info=True)
 
         sorted_quotes = sorted(quote_list, key=lambda x: x['total_price'])
         return {"code": 200, "message": "success", "data": sorted_quotes}

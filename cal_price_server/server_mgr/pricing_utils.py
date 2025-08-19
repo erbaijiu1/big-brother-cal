@@ -152,11 +152,12 @@ def get_type_max_fee(price_rules: str, volume: float, weight: float, details: Li
         unit_price = unit_price + earn_money
 
     # logger.info(f"unit_price: {unit_price}, earn_money: {earn_money}")
-    details.append(FeeDetail(
-        name=name, rule=target_rule, applied_value=target_unit,
-        amount=unit_price,
-        cn_name=cn_name
-    ))
+    if target_rule is not None:
+        details.append(FeeDetail(
+            name=name, rule=target_rule, applied_value=target_unit,
+            amount=unit_price,
+            cn_name=cn_name
+        ))
 
     return unit_price
 
@@ -190,7 +191,7 @@ def calculate_total_price(
         total = unit_price + delivery + sum(f.amount for f in details if f.name not in ['unit_price','delivery_fee'])
         return total, channel_cfg, details
     except Exception as e:
-        logger.error(f"Error in calculate_total_price: {e}", exc_info=True)
+        logger.error(f"Error in calculate_total_price: rule_id: {rule.id}, error:{e}", exc_info=True)
         return -1, None, []
 
 def check_if_channel_filter(channel: str, context, weight: float, volume: float) -> bool:
