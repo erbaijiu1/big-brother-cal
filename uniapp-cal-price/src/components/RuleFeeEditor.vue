@@ -265,8 +265,10 @@ defineExpose({ save })
 
 <style scoped>
 .rule-editor{ display:flex; flex-direction:column; gap:16rpx; }
-.rule-editor.dense :is(.card, .thead, .row){ font-size:24rpx; }
-
+/* 原来：.rule-editor.dense :is(.card, .thead, .row){ ... } */
+.rule-editor.dense .card,
+.rule-editor.dense .thead,
+.rule-editor.dense .row { font-size:24rpx; }
 
 .seg{
   padding:10rpx 18rpx; border:1px solid #ddd; border-radius:999px; background:#fff; color:#666;
@@ -275,7 +277,9 @@ defineExpose({ save })
 
 .thead,.row{ display:flex; align-items:center; margin-bottom:8rpx; }
 .thead{ font-weight:bold; background:#f6f8fa; padding:8rpx 10rpx; border-radius:8rpx; }
+/* sticky 在部分基础库不稳定，留着也不致命；如有兼容问题，可以去掉 */
 .sticky{ position: sticky; top: 0; z-index: 1; }
+
 .col-range{ flex: 1 1 220rpx; min-width: 180rpx; }
 .col-price{ flex: 0 0 160rpx; text-align:center; }
 .col-base{  flex: 0 0 140rpx; text-align:center; }
@@ -286,7 +290,9 @@ defineExpose({ save })
 .save{ text-align:right; margin-top:8rpx; }
 
 input{ border:1px solid #eee; border-radius:6rpx; padding:6rpx 10rpx; background:#fff; width:92%; }
-:deep(.uni-easyinput){ width:100%; }
+/* 原来：:deep(.uni-easyinput){ width:100%; } */
+::v-deep .uni-easyinput { width:100%; }
+/* 如果 ::v-deep 也不行，试 /deep/ .uni-easyinput { width:100%; } */
 
 @media (max-width: 750px){
   .thead{ display:none; }
@@ -295,7 +301,7 @@ input{ border:1px solid #eee; border-radius:6rpx; padding:6rpx 10rpx; background
   .col-action{ flex: 0 0 100%; text-align:right; }
 }
 
-/* 两行单选控件（按草图） */
+/* 两行单选控件 */
 .control-grid{ display:flex; flex-direction:column; gap:14rpx; margin: 4rpx 0 12rpx; }
 .control-grid .row{ display:flex; align-items:center; gap:12rpx; }
 .control-grid .label{ width: 140rpx; color:#333; font-weight:600; }
@@ -307,22 +313,19 @@ input{ border:1px solid #eee; border-radius:6rpx; padding:6rpx 10rpx; background
   border: 2rpx solid #c0c4cc; box-sizing:border-box; background:#fff;
   display:inline-block; position:relative;
 }
-.dot.on{
-  border-color:#1f7ae0;
-}
+.dot.on{ border-color:#1f7ae0; }
 .dot.on::after{
   content:''; position:absolute; left:50%; top:50%;
-  width:18rpx; height:18rpx; border-radius:50%;
-  background:#1f7ae0; transform:translate(-50%, -50%);
+  width:18rpx; height:18rpx; border-radius:50%; background:#1f7ae0; transform:translate(-50%, -50%);
 }
 
-/* dense 模式更紧凑一些 */
+/* dense 模式 */
 .rule-editor.dense .control-grid .label{ width: 128rpx; }
 .rule-editor.dense .radios{ gap:22rpx; }
 .rule-editor.dense .dot{ width: 28rpx; height: 28rpx; }
 .rule-editor.dense .dot.on::after{ width:16rpx; height:16rpx; }
 
-/* 如果吸顶表头和控件距离太近，可给表头留点空隙 */
+/* 吸顶表头与控件间距 */
 .sticky{ top: 6rpx; }
-
 </style>
+

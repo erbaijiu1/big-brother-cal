@@ -21,7 +21,7 @@
     <!-- 体积 -->
     <view class="form-item">
       <text class="label">体积（m³）</text>
-      <input type="number" v-model.number="volume" placeholder="体积先填" class="input" />
+      <input type="number" v-model.number="volume" placeholder="体积选填：如0.02" class="input" />
       <view class="field-tip">体积重公式：体积 × 200 ≈ kg</view>
     </view>
 
@@ -87,7 +87,8 @@
     <button class="submit-button" @click="submit">我要报价</button>
 
     <!-- 报价结果弹窗 -->
-    <uni-popup ref="resultPopup" type="dialog" class="result-popup">
+    <uni-popup ref="resultPopup" type="dialog" class="result-popup"
+      custom-style="width:80%;max-width:700rpx;border-radius:20rpx;">
       <view class="popup">
         <text class="popup-title">报价结果</text>
 
@@ -103,6 +104,7 @@
               <view>
                 <text class="plan">方案{{ index + 1 }}</text>
                 <text class="channel-label">{{ item.channel }}</text>
+                <text class="channel-label">{{ item.transport_method }}</text>
               </view>
               <text class="price">{{ item.total_price }} 元</text>
             </view>
@@ -117,6 +119,11 @@
               备注：{{ item.remark }}
             </view>
           </view>
+        </view>
+
+        <!-- ✅ 添加“上楼费咨询客服”提示 -->
+        <view v-if="needGoUpstairs === '1'" class="extra-fee-tip">
+          上楼费请咨询客服
         </view>
 
         <!-- ✅ 添加按钮 -->
@@ -328,13 +335,14 @@ export default {
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 12rpx;
-  padding: 18rpx 20rpx;
+  padding: 0rpx 20rpx;
   font-size: 28rpx;
   min-height: 64rpx;
   width: 100%;
   box-sizing: border-box;
   display: flex;
   align-items: center;
+  line-height: 64rpx;
 }
 .picker-box .main-category { font-weight: bold; color: #333; }
 

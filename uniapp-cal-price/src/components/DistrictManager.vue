@@ -37,10 +37,10 @@
         <view class="form-item">
           <input v-model.trim="form.name_en" placeholder="英文名" class="input" />
         </view>
-        <view v-if="popupMode === 'sub'" class="form-item remote-box">
+        <!-- <view v-if="popupMode === 'sub'" class="form-item remote-box">
           <text>是否偏远区</text>
           <switch v-model="form.is_remote" />
-        </view>
+        </view> -->
         <view class="actions">
           <button size="mini" @click="popup.close">取消</button>
           <button size="mini" type="primary" @click="save">保存</button>

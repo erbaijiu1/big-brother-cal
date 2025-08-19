@@ -48,7 +48,7 @@ export default {
 
       /* #ifdef MP-WEIXIN */
       wx.openEmbeddedMiniProgram({
-        appId: '',
+        appId: 'wx3c11569eb1c89a87',
         path: link
       })
       /* #endif */
