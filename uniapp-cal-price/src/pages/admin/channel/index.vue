@@ -11,9 +11,7 @@
         <button class="mini-btn" @click="resetQuery">重置</button>
 
         <label class="switch-wrap">
-          <switch 
-            :checked="query.include_deleted"
-            @change="onIncludeDeletedChange" />
+          <switch :checked="query.include_deleted" @change="onIncludeDeletedChange" />
           <text class="switch-label">显示已删除</text>
         </label>
 
@@ -25,6 +23,7 @@
     <view class="table-head">
       <text class="code">渠道编码</text>
       <text class="name">渠道名称</text>
+      <text class="surcharge">附加费</text> <!-- 新增 -->
       <text class="remark">备注</text>
       <text class="status">状态</text>
       <text class="action">操作</text>
@@ -36,19 +35,21 @@
         <text class="code">{{ row.channel_code }}</text>
         <text class="name">{{ row.channel_name }}</text>
 
+        <!-- 新增：附加费摘要 -->
+        <view class="surcharge">
+          <SurchargeSummary :rules="row.surcharge_rules" :nameMaps="nameMaps" :limit="2" />
+        </view>
+
         <!-- 备注 2 行省略，title 提示完整文本 -->
         <text class="remark" :title="row.remark">{{ row.remark }}</text>
 
         <view class="status">
-          <uni-tag
-            :text="row.delete_flag ? '已删' : '正常'"
-            :type="row.delete_flag ? 'error' : 'success'"
-            size="mini"
-          />
+          <uni-tag :text="row.delete_flag ? '已删' : '正常'" :type="row.delete_flag ? 'error' : 'success'" size="mini" />
         </view>
 
         <view class="action">
           <button v-if="!row.delete_flag" size="mini" plain @click="showEditDialog(row)">编辑</button>
+          <button v-if="!row.delete_flag" size="mini" plain type="primary" @click="openSurcharge(row)">附加费</button>
           <button v-if="!row.delete_flag" size="mini" type="warn" :plain="true" @click="handleDelete(row)">删</button>
           <button v-if="row.delete_flag" size="mini" type="primary" plain @click="handleRecover(row)">恢</button>
         </view>
@@ -57,13 +58,8 @@
 
     <!-- █████ 分页 █████ -->
     <view class="pagination">
-      <uni-pagination
-        :total="total"
-        :current="query.page"
-        :pageSize="query.page_size"
-        show-icon
-        @change="onPageChange"
-      />
+      <uni-pagination :total="total" :current="query.page" :pageSize="query.page_size" show-icon
+        @change="onPageChange" />
     </view>
 
     <!-- █████ 编辑弹窗 █████ -->
@@ -88,11 +84,20 @@
       </view>
     </uni-popup>
   </view>
+
+
+  <!-- 页面最底部挂载弹窗组件 -->
+  <SurchargeEditor ref="surchargeRef" />
+
+
 </template>
 
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import SurchargeEditor from '@/components/SurchargeEditor.vue'
+import SurchargeSummary from '@/components/SurchargeSummary.vue'
+
 import { onPullDownRefresh } from '@dcloudio/uni-app'
 // import { showToast, showModal } from '@/common/utils/uniApi' // 可直接用 uni.showToast/uni.showModal
 import { BASE_URL } from '@/common/config'
@@ -107,6 +112,15 @@ const query = reactive({
 })
 
 const searchFormRef = ref(null)
+
+// —— 名称映射（给摘要组件更好地显示用，可选）——
+const nameMaps = reactive({
+  areaCatsById: {}, // { [id]: name }
+  distsById: {},    // { [id]: name_cn }
+  subsById: {}      // { [id]: `${district}·${name_cn}` }
+})
+
+
 
 // 编辑弹窗
 const editPopup = ref(null)
@@ -141,8 +155,14 @@ function fetchData() {
     method: 'POST',
     data: { ...query },
     success(res) {
-        console.log(res)
-      list.value = res.data.data
+      list.value = (res.data.data || []).map(row => {
+        // 尽量解析为对象，失败保持原样
+        let rules = row.surcharge_rules
+        if (typeof rules === 'string') {
+          try { rules = JSON.parse(rules || '{}') } catch (e) { rules = {} }
+        }
+        return { ...row, surcharge_rules: rules }
+      })
       total.value = res.data.total
     }
   })
@@ -268,6 +288,37 @@ function onIncludeDeletedChange(e) {
 }
 
 
+const surchargeRef = ref(null)
+function openSurcharge(row) {
+  if (!row?.id) return uni.showToast({ title: '请先保存渠道', icon:'none' })
+  // 传第二个参数可减少一次网络请求；没有也行
+  const payload = row.surcharge_rules && row.surcharge_rules.surcharges ? row.surcharge_rules : null
+  surchargeRef.value.open(row.id, payload)
+}
+
+
+function preloadNameMaps() {
+  // 你已有接口的话直接替换为你的 api：
+  uni.request({ url: `${BASE_URL}/cal_price/area_categories`, method: 'GET',
+    success(res) {
+      (res.data || []).forEach(c => { nameMaps.areaCatsById[c.id] = c.name })
+    }
+  })
+  uni.request({ url: `${BASE_URL}/cal_price/districts`, method: 'GET',
+    success(res) {
+      (res.data || []).forEach(d => {
+        nameMaps.distsById[d.id] = d.name_cn
+        ;(d.subs || []).forEach(s => {
+          nameMaps.subsById[s.id] = `${d.name_cn}·${s.name_cn}`
+        })
+      })
+    }
+  })
+}
+
+onMounted(preloadNameMaps)
+
+
 </script>
 
 <style>
@@ -315,6 +366,7 @@ function onIncludeDeletedChange(e) {
 /* flex 列宽：20% | 20% | auto | 90px | 170px */
 .code   { flex: 0 0 20%; }
 .name   { flex: 0 0 20%; }
+.surcharge { flex: 0 0 30%; }   /* 新增 */
 .remark {
   flex: 1 1 auto;
   overflow: hidden;

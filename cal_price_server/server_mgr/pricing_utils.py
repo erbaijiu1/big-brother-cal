@@ -169,8 +169,8 @@ def calculate_total_price(
     extra_fee_data: Dict[str, Any]
 ) -> Tuple[float, Any, List[FeeDetail]]:
     """
-    返回 (total_amount, channel_config, details_list)
-    details_list 包含 unit_price, delivery_fee 及每项附加费的明细
+    返回(total_amount, channel_config, details)
+    details 含：unit_price、delivery_fee 以及命中的附加费明细
     """
     details: List[FeeDetail] = []
     try:
@@ -180,19 +180,21 @@ def calculate_total_price(
         # 2. 派送费
         delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, details, 'delivery_fee', '派送费')
 
-        # 3. 附加费
+        # 3. 附加费（新结构）
         channel_cfg = get_channel_config_by_channel(rule.channel)
-        surcharge_raw = json.loads(channel_cfg.surcharge_rules or '{}')
-        surcharge_rules = surcharge_raw.get('surcharges', {})
-        # sea_crossing_fee etc.
-        for fee in calculate_surcharge_with_breakdown({**extra_fee_data,'weight':weight,'volume':volume}, surcharge_rules):
+        cfg_json = json.loads(channel_cfg.surcharge_rules or '{}')
+        surcharge_list = cfg_json.get('surcharges', [])      # 新结构：数组
+
+        ctx = {**extra_fee_data, "weight": weight, "volume": volume}
+        for fee in calculate_surcharge_with_breakdown_new(ctx, surcharge_list):
             details.append(fee)
 
         total = unit_price + delivery + sum(f.amount for f in details if f.name not in ['unit_price','delivery_fee'])
         return total, channel_cfg, details
     except Exception as e:
-        logger.error(f"Error in calculate_total_price: rule_id: {rule.id}, error:{e}", exc_info=True)
+        logger.error(f"Error in calculate_total_price: rule_id:{rule.id}, error:{e}", exc_info=True)
         return -1, None, []
+
 
 def check_if_channel_filter(channel: str, context, weight: float, volume: float) -> bool:
     channel_config = get_channel_config_by_channel( channel)
@@ -234,4 +236,114 @@ def check_if_channel_rule_filter(rule: PricingRule, context, weight, volume):
         return True
 
     return check_filter_rule_imp(rule.filter_rules, context, weight, volume)
+
+
+# —— 工具 —— #
+def _split_names(s: str) -> list[str]:
+    if not s:
+        return []
+    return [x.strip() for x in s.replace('，', ',').split(',') if x.strip()]
+
+def _in_range(v: float, r: str | None) -> bool:
+    if not r:
+        return True
+    low, high = parse_range(r)  # 你已有 parse_range(low-high)
+    return low < v <= high
+
+
+# —— 新：统一“新格式”附加费计算 —— #
+def calculate_surcharge_with_breakdown_new(
+    context: Dict[str, Any],
+    surcharges_list: List[Dict[str, Any]]
+) -> List[FeeDetail]:
+    """
+    仅支持新结构:
+    - 每条 surcharge: { key,title,type,price,conditions,scope,combine }
+    - scope.mode: district | sub_district | area_category
+    - combine: sum|max|first，针对“同 key”如何聚合
+    返回：逐条命中的 FeeDetail（已按 combine 处理）
+    """
+    breakdown: list[FeeDetail] = []
+    vol = float(context.get("volume", 0.0))
+    kg  = float(context.get("weight", 0.0))
+
+    cur_district     = context.get("district")
+    cur_sub_district = context.get("sub_district")
+    cur_area_cats    = set(context.get("area_category_ids", []) or [])
+
+    # 命中按 key 分桶，最后按 combine 聚合
+    hit_by_key: dict[str, list[FeeDetail]] = {}
+
+    for rule in (surcharges_list or []):
+        key     = rule.get("key") or "surcharge"
+        title   = rule.get("title") or key
+        rtype   = (rule.get("type") or "area").lower()
+        price   = float(rule.get("price", 0))
+        combine = (rule.get("combine") or "sum").lower()
+
+        # 1) 条件
+        cond = rule.get("conditions") or {}
+        if not _in_range(vol, cond.get("volume_range")):
+            continue
+        if not _in_range(kg,  cond.get("weight_range")):
+            continue
+        ok = True
+        for k, v in cond.items():
+            if k in ("volume_range", "weight_range"):
+                continue
+            if context.get(k) != v:
+                ok = False
+                break
+        if not ok:
+            continue
+
+        # 2) 作用域
+        scope = rule.get("scope") or {}
+        mode  = scope.get("mode")
+        names = scope.get("names") or []
+        match_scope = True
+
+        if rtype == "area":
+            if mode == "district":
+                match_scope = cur_district in names
+            elif mode == "sub_district":
+                match_scope = cur_sub_district in names
+            elif mode == "area_category":
+                # 假设 names 放的是 int 的 category_id；若你用字符串别名，也可以在此做映射
+                try:
+                    name_ids = {int(x) for x in names}
+                    match_scope = not name_ids.isdisjoint(cur_area_cats)
+                except Exception:
+                    # names 不是数字，也可直接和 extra 传进来的别名列表做交集
+                    match_scope = False
+            else:
+                match_scope = True  # 无 scope 默认放行
+
+        if not match_scope:
+            continue
+
+        fd = FeeDetail(
+            name=key,
+            cn_name=title,
+            rule=rule,
+            applied_value=max(vol, kg),
+            amount=price
+        )
+        hit_by_key.setdefault(key, []).append(fd)
+
+    # 3) 同 key 聚合
+    for key, items in hit_by_key.items():
+        if not items:
+            continue
+        comb = (items[0].rule.get("combine") or "sum").lower()
+        if comb == "sum":
+            breakdown.extend(items)
+        elif comb == "max":
+            breakdown.append(max(items, key=lambda x: x.amount))
+        elif comb == "first":
+            breakdown.append(items[0])
+        else:
+            breakdown.extend(items)  # 未知策略 -> sum
+
+    return breakdown
 
