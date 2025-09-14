@@ -63,11 +63,11 @@
     </view>
 
     <!-- █████ 编辑弹窗 █████ -->
-    <uni-popup ref="editPopup" type="dialog">
+    <uni-popup ref="editPopup" type="dialog" class="wide-popup">
       <view class="edit-dialog">
         <uni-forms :modelValue="editDialog.form" :rules="editRules" ref="editFormRef" label-width="80px">
           <uni-forms-item name="channel_code" label="渠道编码">
-            <uni-easyinput v-model="editDialog.form.channel_code" placeholder="请输入渠道编码" />
+            <uni-easyinput v-model="editDialog.form.channel_code" placeholder="请输入渠道编码" :disabled="editDialog.isEdit" />
           </uni-forms-item>
           <uni-forms-item name="channel_name" label="渠道名称">
             <uni-easyinput v-model="editDialog.form.channel_name" placeholder="请输入渠道名称" />
@@ -87,7 +87,8 @@
 
 
   <!-- 页面最底部挂载弹窗组件 -->
-  <SurchargeEditor ref="surchargeRef" />
+  <SurchargeEditor ref="surchargeRef" @saved="fetchData" />
+
 
 
 </template>
@@ -385,8 +386,16 @@ onMounted(preloadNameMaps)
   background: #ffffff;
   padding: 24rpx;
   border-radius: 12rpx;
-  width: 600rpx;
+  width: 90%; /* Use 90% of the viewport width */
+  max-width: 800rpx; /* Optional: limit maximum width */
 }
+
+.wide-popup .uni-popup__wrapper-box {
+  width: 90% !important;
+  max-width: 1000rpx !important;
+  min-width: 600rpx !important; /* 添加最小宽度以防止过窄 */
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

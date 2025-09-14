@@ -4,8 +4,11 @@ from typing import Optional, Dict, Any, List, Tuple
 from pydantic import BaseModel, Field
 
 import config
+from db.area_category_db_handle import get_sub_district_names_by_category_ids
 from db.channel_db_handle import get_channel_config_by_channel
 from db.db_models import PricingRule
+from db.district_db_handle import get_district_list, get_districts_by_ids
+from db.sub_district_db_handle import get_sub_district_names_by_ids
 from utils.logger_config import logger
 
 
@@ -20,7 +23,7 @@ class QuoteRequest(BaseModel):
 
 
 class FeeDetail(BaseModel):
-    name: str                      # 费用项名称，如 "unit_price"、"delivery_fee"、"sea_crossing_fee"
+    name: str                      # 费用项名称，如 "unit_price"、"delivery_fee"、"surcharge_fee"
     rule: Dict[str, Any]           # 生效的规则原文
     applied_value: float           # 用于匹配规则的值（如 weight 或 volume)
     amount: float                  # 此项费用金额
@@ -174,8 +177,8 @@ def calculate_total_price(
     """
     details: List[FeeDetail] = []
     try:
-        # 1. 单价费用
-        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, details, 'unit_price', '单价费用')
+        # 1. 运输费用
+        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, details, 'unit_price', '运输费用')
 
         # 2. 派送费
         delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, details, 'delivery_fee', '派送费')
@@ -197,13 +200,18 @@ def calculate_total_price(
 
 
 def check_if_channel_filter(channel: str, context, weight: float, volume: float) -> bool:
-    channel_config = get_channel_config_by_channel( channel)
+    channel_config = get_channel_config_by_channel(channel)
+    logger.debug(f"check_if_channel_filter: channel:{channel}, context:{context}, weight:{weight}, volume:{volume}")
     return check_filter_rule_imp(channel_config.filter_rules, context, weight, volume)
 
 def check_filter_rule_imp(filter_rules:str, context, weight: float, volume: float):
-    filter_config = json.loads(filter_rules or '{}')
+    if not filter_rules or len(filter_rules) <= 0:
+        return False
+
+    filter_config = json.loads(filter_rules) if isinstance(filter_rules, str) else (filter_rules or {})
     # 没有过滤条件，直接返回 True 或 False，看你的业务需求
-    if not filter_config:
+    if not filter_config or not isinstance(filter_config, dict):
+        logger.error("Invalid filter_rules: %s", filter_rules)
         return False
 
     for key, value in filter_config.items():
@@ -291,7 +299,7 @@ def calculate_surcharge_with_breakdown_new(
         for k, v in cond.items():
             if k in ("volume_range", "weight_range"):
                 continue
-            if context.get(k) != v:
+            if context.get(k) and len(context.get(k)) > 0 and context.get(k) != v:
                 ok = False
                 break
         if not ok:
@@ -299,20 +307,28 @@ def calculate_surcharge_with_breakdown_new(
 
         # 2) 作用域
         scope = rule.get("scope") or {}
-        mode  = scope.get("mode")
-        names = scope.get("names") or []
+        mode = scope.get("mode")
+        names = []
+        ids = scope.get("ids", [])
+
         match_scope = True
 
         if rtype == "area":
             if mode == "district":
+                id_list = get_districts_by_ids(ids)
+                names = [x.name_cn for x in id_list]
                 match_scope = cur_district in names
+
             elif mode == "sub_district":
+                names = get_sub_district_names_by_ids(ids)
                 match_scope = cur_sub_district in names
+                logger.debug(f"match_scope: {cur_sub_district} in {names}")
+
             elif mode == "area_category":
                 # 假设 names 放的是 int 的 category_id；若你用字符串别名，也可以在此做映射
                 try:
-                    name_ids = {int(x) for x in names}
-                    match_scope = not name_ids.isdisjoint(cur_area_cats)
+                    names = get_sub_district_names_by_category_ids(ids)
+                    match_scope = cur_sub_district in names
                 except Exception:
                     # names 不是数字，也可直接和 extra 传进来的别名列表做交集
                     match_scope = False
@@ -323,7 +339,7 @@ def calculate_surcharge_with_breakdown_new(
             continue
 
         fd = FeeDetail(
-            name=key,
+            name="surcharge_fee",
             cn_name=title,
             rule=rule,
             applied_value=max(vol, kg),

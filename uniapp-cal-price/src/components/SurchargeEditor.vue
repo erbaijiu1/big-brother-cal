@@ -12,7 +12,8 @@
             <view class="rule-title">
               <text class="key">{{ r.key }}</text>
               <text class="title">（{{ r.title }}）</text>
-              <uni-tag :text="r.type==='global' ? '全局' : '区域'" :type="r.type==='global' ? 'success' : 'primary'" size="mini"/>
+              <uni-tag :text="r.type==='global' ? '全局' : '区域'" :type="r.type==='global' ? 'success' : 'primary'"
+                size="mini" />
             </view>
             <view class="rule-actions">
               <button size="mini" plain @click="editRule(idx)">编辑</button>
@@ -22,7 +23,8 @@
 
           <view class="rule-body">
             <view class="row"><text class="lbl">价格</text><text>¥{{ r.price }}</text></view>
-            <view class="row" v-if="r.conditions && (r.conditions.volume_range || r.conditions.weight_range || r.conditions.vehicle)">
+            <view class="row"
+              v-if="r.conditions && (r.conditions.volume_range || r.conditions.weight_range || r.conditions.vehicle)">
               <text class="lbl">条件</text>
               <text>
                 <template v-if="r.conditions.volume_range">体积: {{ r.conditions.volume_range }}；</template>
@@ -33,10 +35,10 @@
             <view class="row"><text class="lbl">合并</text><text>{{ r.combine || 'sum' }}</text></view>
 
             <template v-if="r.type==='area'">
-              <view class="row"><text class="lbl">解析</text><text>{{ r.resolve || 'runtime' }}</text></view>
+              <!-- <view class="row"><text class="lbl">解析</text><text>{{ r.resolve || 'runtime' }}</text></view> -->
               <view class="row"><text class="lbl">范围</text>
                 <text>
-                  <template v-if="r.scope?.mode==='area_category'">按自定义分类</template>
+                  <template v-if="r.scope?.mode==='area_category'">按自定义区</template>
                   <template v-else-if="r.scope?.mode==='district'">按行政区</template>
                   <template v-else-if="r.scope?.mode==='sub_district'">按子区</template>
                 </text>
@@ -46,7 +48,7 @@
                 <text class="wrap">{{ renderScopeNames(r) }}</text>
               </view>
               <view class="row" v-if="r.sub_ids_snapshot?.length">
-                <text class="lbl">快照</text>
+                <!-- <text class="lbl">快照</text> -->
                 <text class="wrap">子区共 {{ r.sub_ids_snapshot.length }} 个</text>
               </view>
             </template>
@@ -67,11 +69,11 @@
           <view class="inner-title">{{ editingIdx===null ? '新增附加费' : '编辑附加费' }}</view>
 
           <uni-forms :modelValue="ruleForm" ref="ruleFormRef" label-width="90px">
-            <uni-forms-item name="key" label="唯一键">
+            <!-- <uni-forms-item name="key" label="唯一键">
               <uni-easyinput v-model.trim="ruleForm.key" placeholder="如 sea_crossing_fee_van"/>
-            </uni-forms-item>
+            </uni-forms-item> -->
             <uni-forms-item name="title" label="标题">
-              <uni-easyinput v-model.trim="ruleForm.title" placeholder="展示名称"/>
+              <uni-easyinput v-model.trim="ruleForm.title" placeholder="展示名称" />
             </uni-forms-item>
 
             <uni-forms-item name="type" label="类型">
@@ -81,7 +83,7 @@
             </uni-forms-item>
 
             <uni-forms-item name="price" label="价格">
-              <uni-easyinput v-model.number="ruleForm.price" type="number" placeholder="整数，单位元"/>
+              <uni-easyinput v-model.number="ruleForm.price" type="number" placeholder="整数，单位元" />
             </uni-forms-item>
 
             <uni-forms-item name="combine" label="合并">
@@ -92,19 +94,19 @@
 
             <uni-forms-item label="条件(选填)">
               <view class="cond">
-                <uni-easyinput v-model.trim="ruleForm.conditions.volume_range" placeholder="体积范围 例: 0-0.2"/>
-                <uni-easyinput v-model.trim="ruleForm.conditions.weight_range" placeholder="重量范围 例: 0-40"/>
-                <uni-easyinput v-model.trim="ruleForm.conditions.vehicle" placeholder="车型 例: van/truck"/>
+                <uni-easyinput v-model.trim="ruleForm.conditions.volume_range" placeholder="体积范围 例: 0-0.2" />
+                <uni-easyinput v-model.trim="ruleForm.conditions.weight_range" placeholder="重量范围 例: 0-40" />
+                <uni-easyinput v-model.trim="ruleForm.conditions.vehicle" placeholder="车型 例: van/truck" />
               </view>
             </uni-forms-item>
 
             <!-- 区域相关 -->
             <view v-if="ruleForm.type==='area'">
-              <uni-forms-item name="resolve" label="解析">
+              <!-- <uni-forms-item name="resolve" label="解析">
                 <picker :range="resolveOptions" range-key="label" @change="onResolveChange">
                   <view class="picker">{{ resolveOptions.find(v=>v.value===ruleForm.resolve)?.label }}</view>
                 </picker>
-              </uni-forms-item>
+              </uni-forms-item> -->
 
               <uni-forms-item name="scopeMode" label="关联到">
                 <picker :range="scopeModeOptions" range-key="label" @change="onScopeModeChange">
@@ -112,22 +114,29 @@
                 </picker>
               </uni-forms-item>
 
-              <!-- 选择器 -->
               <view class="chooser">
                 <view class="chooser-head">
-                  <input v-model.trim="keyword" class="search" placeholder="搜索"/>
+                  <input v-model.trim="keyword" class="search" placeholder="搜索" />
                 </view>
-                <scroll-view scroll-y class="chooser-list">
-                  <view v-for="opt in filteredOptions" :key="opt.id" class="opt" @click="togglePick(opt)">
-                    <checkbox :checked="pickedIds.includes(opt.id)" />
-                    <text class="name">{{ opt.name }}</text>
-                    <text v-if="opt.parent" class="parent">（{{ opt.parent }}）</text>
-                  </view>
-                </scroll-view>
+
+                <!-- 用 checkbox-group 管理 pickedIds -->
+                <checkbox-group :value="pickedIds" @change="onPickChange">
+                  <scroll-view scroll-y class="chooser-list">
+                    <label v-for="opt in filteredOptions" :key="opt.id" class="opt">
+                      <!-- value 必须是字符串；checked 让 UI 与 pickedIds 对齐 -->
+                      <checkbox :value="String(opt.id)" :checked="pickedIds.includes(String(opt.id))" />
+                      <text class="name">{{ opt.name }}</text>
+                      <text v-if="opt.parent" class="parent">（{{ opt.parent }}）</text>
+                    </label>
+                  </scroll-view>
+                </checkbox-group>
+
                 <view class="picked">
                   <text>已选：{{ pickedIds.length }} 个</text>
                 </view>
               </view>
+
+
             </view>
           </uni-forms>
 
@@ -144,6 +153,9 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { getChannelSurcharges, saveChannelSurcharges, getAreaCategories, getDistricts } from '@/api/channel'
+
+const emit = defineEmits(['saved'])
+
 
 const popup = ref(null)
 const innerPop = ref(null)
@@ -167,7 +179,7 @@ const resolveOptions = [
   { label: '保存时快照(snapshot)', value: 'snapshot' }
 ]
 const scopeModeOptions = [
-  { label: '自定义分类', value: 'area_category' },
+  { label: '自定义区', value: 'area_category' },
   { label: '行政区', value: 'district' },
   { label: '子区', value: 'sub_district' },
 ]
@@ -221,10 +233,11 @@ function open(id, initialPayload = null) {
 
 // ====== 保存到后端 ======
 function save() {
-  if (!chanId.value) return uni.showToast({ title: '渠道ID缺失', icon: 'none' })
   saveChannelSurcharges(chanId.value, { surcharges: form.surcharges }).then(() => {
     uni.showToast({ title: '已保存', icon: 'success' })
     popup.value.close()
+    // 通知父组件刷新
+    emit('saved')
   })
 }
 
@@ -238,8 +251,17 @@ function openEditor() {
 function editRule(idx) {
   editingIdx.value = idx
   Object.assign(ruleForm, JSON.parse(JSON.stringify(form.surcharges[idx])))
-  pickedIds.value = (ruleForm.scope?.ids || []).slice()
+  // pickedIds.value = (ruleForm.scope?.ids || []).slice()
+  console.log("scope:", ruleForm.scope?.ids)
+  pickedIds.value = (ruleForm.scope?.ids || []).map(String)
+
   innerPop.value.open()
+}
+
+function onPickChange(e) {
+  // e.detail.value 是 string[]
+  pickedIds.value = e.detail.value
+  // console.log('pickedIds ->', pickedIds.value)
 }
 
 function removeRule(idx) {
@@ -248,18 +270,33 @@ function removeRule(idx) {
   })
 }
 
+
 function commitRule() {
   // 简单校验
-  if (!ruleForm.key || !ruleForm.title) return uni.showToast({ title: '请填写唯一键与标题', icon: 'none' })
-  if (ruleForm.type === 'area' && (!ruleForm.scope || pickedIds.value.length === 0)) {
+  if (!ruleForm.title) {
+    return uni.showToast({ title: '请填写标题', icon: 'none' })
+  }
+  console.log(ruleForm.type, pickedIds.value.length)
+  if (ruleForm.type === 'area' && pickedIds.value.length === 0) {
     return uni.showToast({ title: '请选择关联范围', icon: 'none' })
   }
+
   const data = JSON.parse(JSON.stringify(ruleForm))
-  if (data.type === 'area') data.scope.ids = pickedIds.value.slice()
-  if (editingIdx.value === null) form.surcharges.push(data)
-  else form.surcharges.splice(editingIdx.value, 1, data)
+
+  // 保存时把 scope.ids 填进去
+  if (data.type === 'area') {
+    data.scope.ids = pickedIds.value.map(v => Number(v)) // 转成数字数组
+  }
+
+  if (editingIdx.value === null) {
+    form.surcharges.push(data)
+  } else {
+    form.surcharges.splice(editingIdx.value, 1, data)
+  }
+
   innerPop.value.close()
 }
+
 
 // ====== 小工具 / 事件 ======
 function renderScopeNames(r) {
@@ -289,12 +326,6 @@ function onScopeModeChange(e) {
   const v = scopeModeOptions[e.detail.value].value
   ruleForm.scope.mode = v
   pickedIds.value = []
-}
-
-function togglePick(opt) {
-  const i = pickedIds.value.indexOf(opt.id)
-  if (i >= 0) pickedIds.value.splice(i, 1)
-  else pickedIds.value.push(opt.id)
 }
 
 function resetRuleForm() {
@@ -341,7 +372,7 @@ defineExpose({ open })
 .dlg-actions { display:flex; justify-content:flex-end; gap:16rpx; margin-top:14rpx; }
 .dlg-actions .add { background:#f6f7fb; }
 
-.inner { width: 820rpx; background:#fff; border-radius:16rpx; padding:20rpx; }
+.inner { width: 90%; height: 90%;  background:#fff; border-radius:16rpx; padding:20rpx; overflow: auto;}
 .inner-title { font-size:28rpx; font-weight:600; margin-bottom:10rpx; text-align:center; }
 .picker { padding: 8rpx 12rpx; color:#666; min-height: 60rpx; display:flex; align-items:center; border:1px solid #eee; border-radius:8rpx; }
 .cond { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8rpx; }

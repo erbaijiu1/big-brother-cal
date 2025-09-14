@@ -47,7 +47,7 @@ class SurchargeScope(BaseModel):
     ids: List[int] = Field(default_factory=list)
 
 class SurchargeRule(BaseModel):
-    key: str = Field(..., description="业务唯一键，如 sea_crossing_fee_van")
+    # key: str = Field(..., description="业务唯一键，如 sea_crossing_fee_van")
     title: str = Field(..., description="显示标题")
     type: Literal["global", "area"] = "global"
     price: int = 0
@@ -63,8 +63,10 @@ class SurchargeRule(BaseModel):
 
     @model_validator(mode='after')
     def _check_area_scope(cls, values):
-        t = values.get("type")
-        scope = values.get("scope")
+        # t = values.get("type")
+        # 修复方案2：如果需要安全访问，使用getattr
+        t = getattr(values, 'type', None)
+        scope = getattr(values, 'scope', None)
         if t == "area" and not scope:
             raise ValueError("type=area 时必须提供 scope")
         return values

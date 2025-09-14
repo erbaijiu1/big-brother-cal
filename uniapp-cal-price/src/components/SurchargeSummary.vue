@@ -91,7 +91,7 @@ const areas   = computed(() => items.value.filter(r => r.type === 'area'))
 const visibleItems = computed(() => expanded.value ? items.value : items.value.slice(0, props.limit))
 
 function scopeModeLabel(mode) {
-  if (mode === 'area_category') return '自定义分类'
+  if (mode === 'area_category') return '自定义区'
   if (mode === 'district')      return '行政区'
   if (mode === 'sub_district')  return '子区'
   return '范围'
