@@ -151,7 +151,7 @@ def list_channel(query: ChannelQuery, db: Session = Depends(get_db)):
 
     total = q.count()
     items = (
-        q.order_by(ChannelConfig.id.desc())
+        q.order_by(ChannelConfig.channel_code)
          .offset((query.page - 1) * query.page_size)
          .limit(query.page_size)
          .all()

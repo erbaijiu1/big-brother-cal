@@ -9,7 +9,7 @@ router = APIRouter(prefix="/classify_mgr", tags=["分类管理"])
 @router.get("/", summary="分类分页列表")
 def list_goods(
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = 50,
     keyword: Optional[str] = None,
     include_deleted: int = 0,  # 0:只查未删 1:查全部
     db: Session = Depends(get_db)
