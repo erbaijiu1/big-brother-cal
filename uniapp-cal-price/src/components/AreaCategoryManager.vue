@@ -29,8 +29,8 @@
     <button class="add-btn" type="primary" @click="openAdd">新增类别</button>
 
     <!-- 新增 / 编辑 弹窗 -->
-    <uni-popup ref="editPop" type="dialog">
-      <view class="form">
+    <uni-popup ref="editPop" type="dialog" :style="{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }">
+      <view class="form" style="background-color: white; border-radius: 8rpx; padding: 32rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.1);">
         <input v-model.trim="form.name" placeholder="类别名称" class="input" />
         <view class="actions">
           <button size="mini" @click="editPop.close">取消</button>

@@ -29,8 +29,8 @@
     </view>
 
     <!-- 弹窗表单（行政区 / 子区 共用） -->
-    <uni-popup ref="popup" type="dialog">
-      <view class="form">
+    <uni-popup ref="popup" type="dialog" :style="{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }">
+      <view class="form" style="background-color: white; border-radius: 8rpx; padding: 32rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.1);">
         <view class="form-item">
           <input v-model.trim="form.name_cn" placeholder="中文名" class="input" />
         </view>

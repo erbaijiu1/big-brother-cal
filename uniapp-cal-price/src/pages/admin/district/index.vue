@@ -20,7 +20,7 @@
     import DistrictManager from '@/components/DistrictManager.vue'
     import AreaCategoryManager from '@/components/AreaCategoryManager.vue'
 
-    const tabs = ['行政区维护', '区域类别维护']
+    const tabs = ['行政区维护', '自定义区域类别维护']
     const current = ref(0)
     function onTabChange(e) { current.value = e.currentIndex }
 </script>

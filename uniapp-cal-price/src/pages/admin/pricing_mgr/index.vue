@@ -2,24 +2,18 @@
   <view class="container">
     <!-- █████ 筛选栏 █████ -->
     <uni-forms :modelValue="query" class="search-bar" label-position="left" :label-width="120">
+      <!-- 渠道 -->
       <uni-forms-item name="channel" label="渠道">
-        <picker :range="channelList" range-key="channel_name" @change="onChannelChange">
-          <view class="picker">
-            {{ getChannelName(query.channel) || '全部' }}
-          </view>
+        <picker :range="channelOptions" range-key="display" :value="channelIndex" @change="onChannelChange">
+          <view class="picker">{{ channelDisplay || '全部' }}</view>
         </picker>
       </uni-forms-item>
 
+      <!-- 分类 -->
       <uni-forms-item name="category_id" label="分类">
-        <picker :range="categoryList" range-key="main_category" @change="onCategoryChange">
-          <view class="picker">
-            {{ getCategoryName(query.category_id) || '全部' }}
-          </view>
+        <picker :range="categoryOptions" range-key="main_category" :value="categoryIndex" @change="onCategoryChange">
+          <view class="picker">{{ categoryDisplay || '全部' }}</view>
         </picker>
-      </uni-forms-item>
-
-      <uni-forms-item name="keyword" label="关键词">
-        <uni-easyinput v-model="query.keyword" placeholder="支持模糊查询" @confirm="fetchData" clearable />
       </uni-forms-item>
 
       <view class="btn-group">
@@ -46,7 +40,7 @@
       <text class="action">操作</text>
     </view>
 
-    <!-- █████ 列表正文（可滚动） █████ -->
+    <!-- █████ 列表正文 █████ -->
     <scroll-view scroll-y style="max-height: 70vh">
       <view v-for="row in list" :key="row.id" class="table-row">
         <text class="id">{{ row.id }}</text>
@@ -82,7 +76,7 @@
         @change="onPageChange" />
     </view>
 
-    <!-- 编辑弹窗（大号居中窗 + 内部滚动） -->
+    <!-- 编辑弹窗 -->
     <uni-popup ref="editPopup" type="center">
       <view class="editor-sheet">
         <RuleEditor v-model="editDialog.form" :channelList="channelList" :categoryList="categoryList"
@@ -93,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { onPullDownRefresh } from '@dcloudio/uni-app'
 import { BASE_URL } from '@/common/config'
 import RuleViewer from '@/components/RuleViewer.vue'
@@ -116,84 +110,56 @@ const query = reactive({
 
 const editPopup = ref(null)
 const editDialog = reactive({
-  form: {
-    id: null,
-    channel: '',
-    category_id: 0,
-    transport_method: '',
-    warehouse: '',
-    min_consumption: 0,
-    unit_price_rules: [],
-    surcharge_fee_rules: [],
-    delivery_fee_rules: [],
-    discount_price: '',
-    delivery_time: '',
-    packaging_requirement: '',
-    remark: '',
-    compensation_policy: '',
-    status: 1,
-    filter_rules: ''
-  }
+  form: { id: null, channel: '', category_id: 0 }
 })
 
-/** 工具：把可能为字符串的 JSON 字段转为数组 */
+/** 工具：JSON→数组 */
 function toArr(val) {
   if (Array.isArray(val)) return val
   if (typeof val === 'string') {
-    try {
-      const a = JSON.parse(val)
-      return Array.isArray(a) ? a : []
-    } catch { return [] }
+    try { const a = JSON.parse(val); return Array.isArray(a) ? a : [] } catch { return [] }
   }
   return []
 }
 
-/** 渠道/分类 */
+/** 渠道/分类获取 */
 function fetchChannelList() {
   uni.request({
     url: `${BASE_URL}/cal_price/channel_mgr/`,
     method: 'POST',
     data: {},
-    success(res) {
-      channelList.value = res.data?.data || []
-    }
+    success(res) { channelList.value = res.data?.data || [] }
   })
 }
 function fetchCategoryList() {
   uni.request({
     url: `${BASE_URL}/cal_price/classify_mgr/`,
     method: 'GET',
-    success(res) {
-      categoryList.value = res.data?.data || []
-    }
+    success(res) { categoryList.value = res.data?.data || [] }
   })
 }
+
+/** 表格行展示 */
 function getChannelName(code) {
+  if (!code) return '全部'
   const c = channelList.value.find(item => item.channel_code === code)
-  return c ? c.channel_name : code
+  return c ? `${c.channel_code} - ${c.channel_name || ''}` : code
 }
 function getCategoryName(id) {
-  if (!id || id === 0) return ''
+  if (!id || id === 0) return '全部'
   const c = categoryList.value.find(item => Number(item.category_id) === Number(id))
   return c ? c.main_category : id
 }
 
 /** 生命周期 */
-onMounted(() => {
-  fetchChannelList()
-  fetchCategoryList()
-  fetchData()
-})
+onMounted(() => { fetchChannelList(); fetchCategoryList(); fetchData() })
 
 /** 列表请求 */
 function fetchData() {
   uni.request({
     url: `${BASE_URL}/cal_price/pricing_mgr/`,
     method: 'GET',
-    data: {
-      ...query,
-      include_deleted: query.include_deleted ? 1 : 0
-    },
+    data: { ...query, include_deleted: query.include_deleted ? 1 : 0 },
     success(res) {
       const arr = res.data?.data || []
       list.value = arr.map(item => ({
@@ -220,23 +186,38 @@ function onPageChange(e) {
   query.page_size = e.pageSize
   fetchData()
 }
-function onChannelChange(e) {
-  const index = e.detail.value
-  query.channel = channelList.value[index]?.channel_code || ''
-}
-function onCategoryChange(e) {
-  const index = e.detail.value
-  query.category_id = categoryList.value[index]?.category_id || 0
-}
-function onIncludeDeletedChange(e) {
-  query.include_deleted = !!e.detail.value
-  fetchData()
-}
+
+/** ==== 渠道选择 ==== */
+const channelOptions = computed(() => [
+  { channel_code: '', channel_name: '', display: '全部' },
+  ...(channelList.value || []).map(x => ({ ...x, display: `${x.channel_code} - ${x.channel_name || ''}` }))
+])
+const channelIndex = computed(() => {
+  const i = channelOptions.value.findIndex(opt => String(opt.channel_code) === String(query.channel))
+  return Math.max(0, i)
+})
+const channelDisplay = computed(() => channelOptions.value[channelIndex.value]?.display || '全部')
+
+function onChannelChange(e) { query.channel = channelOptions.value[e.detail.value]?.channel_code || '' }
+
+/** ==== 分类选择 ==== */
+const categoryOptions = computed(() => [
+  { category_id: 0, main_category: '全部' },
+  ...(categoryList.value || [])
+])
+const categoryIndex = computed(() => {
+  const i = categoryOptions.value.findIndex(opt => Number(opt.category_id) === Number(query.category_id))
+  return Math.max(0, i)
+})
+const categoryDisplay = computed(() => categoryOptions.value[categoryIndex.value]?.main_category || '全部')
+function onCategoryChange(e) { query.category_id = categoryOptions.value[e.detail.value]?.category_id || 0 }
+
+/** 其他交互 */
+function onIncludeDeletedChange(e) { query.include_deleted = !!e.detail.value; fetchData() }
 
 /** 编辑弹窗 */
 function showEditDialog(row = null) {
   if (row) {
-    // 编辑：把已有记录灌入（并兼容字符串数组）
     editDialog.form = {
       id: row.id ?? null,
       channel: row.channel ?? '',
@@ -256,7 +237,6 @@ function showEditDialog(row = null) {
       filter_rules: row.filter_rules ?? ''
     }
   } else {
-    // 新建：给一套默认
     editDialog.form = {
       id: null,
       channel: '',
@@ -278,13 +258,10 @@ function showEditDialog(row = null) {
   }
   editPopup.value.open()
 }
-function closeEditDialog() {
-  editPopup.value.close()
-}
+function closeEditDialog() { editPopup.value.close() }
 
-/** 保存（由子组件 RuleEditor 触发） */
+/** 保存 */
 function onSaveFromChild(payload) {
-  // payload 已由 RuleEditor 规范化（数组或字符串按其内部配置）
   const url = payload.id
     ? `${BASE_URL}/cal_price/pricing_mgr/${payload.id}`
     : `${BASE_URL}/cal_price/pricing_mgr/`
@@ -330,10 +307,7 @@ function handleRecover(row) {
 }
 
 /** 下拉刷新 */
-onPullDownRefresh(() => {
-  fetchData()
-  uni.stopPullDownRefresh()
-})
+onPullDownRefresh(() => { fetchData(); uni.stopPullDownRefresh() })
 </script>
 
 <style>
@@ -420,15 +394,14 @@ onPullDownRefresh(() => {
   .search-bar .uni-forms-item { width: 100%; }
 }
 
-/* 大号编辑窗：外层控制宽高，内部滚动 */
-.editor-sheet{
+/* 编辑窗 */
+.editor-sheet {
   width: 92vw;
   max-width: 1080px;
   max-height: 88vh;
   background:#fff;
   border-radius: 14rpx;
-  overflow: auto;  /* 关键：内部滚动 */
+  overflow: auto;
   padding: 16rpx;
 }
-
 </style>
