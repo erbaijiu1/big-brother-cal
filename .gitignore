@@ -12,3 +12,15 @@ cal_price_server/server_mgr/__pycache__
 dist/
 logs/access.log
 logs/error.log
+cal_price_server/api/goods_classify.py~
+cal_price_server/api/channel_mgr_api.py~
+cal_price_server/api_model/__pycache__/
+cal_price_server/api_model/api_request.py~
+cal_price_server/db/area_category_db_handle.py~
+cal_price_server/utils/__pycache__/
+cal_price_server/main.py~
+cal_price_server/requirements.txt~
+cal_price_server/server_mgr/pricing_utils.py~
+cal_price_server/test/test.txt~
+uniapp-cal-price/package-lock.json
+cal_price_server/utils/__pycache__/logger_config.cpython-310.pyc

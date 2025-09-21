@@ -1,9 +1,9 @@
 <template>
     <view class="rule-viewer">
         <view class="viewer-table-head">
-            <text class="col-unit">计价类型</text>
-            <!-- <text class="col-type">计价类型</text> -->
-            <text class="col-range">区间</text>
+            <text class="col-unit">计价方式</text>
+            <!-- <text class="col-type">计价方式</text> -->
+            <text class="col-range">区间范围</text>
             <text class="col-desc">价格说明</text>
         </view>
         <view v-for="(rule, idx) in ruleArr" :key="idx" class="viewer-row">

@@ -1,16 +1,34 @@
-// src/api/channel.js  (js/ts 都可)
-import { BASE_URL } from '@/common/config'
+import { request } from '@/common/utils/request'
 
-// 渠道列表等你已有，这里只补附加费接口
-export const getChannelSurcharges = (id) =>
-  uni.request({ url: `${BASE_URL}/cal_price/channel_mgr/${id}/surcharges`, method: 'GET' })
+// 获取渠道附加费
+export const getChannelSurcharges = (id) => {
+  return request({
+    url: `/cal_price/channel_mgr/${id}/surcharges`,
+    method: 'GET'
+  })
+}
 
-export const saveChannelSurcharges = (id, payload) =>
-  uni.request({ url: `${BASE_URL}/cal_price/channel_mgr/${id}/surcharges`, method: 'PUT', data: payload })
+// 保存渠道附加费
+export const saveChannelSurcharges = (id, payload) => {
+  return request({
+    url: `/cal_price/channel_mgr/${id}/surcharges`,
+    method: 'PUT',
+    data: payload
+  })
+}
 
-// 供选择用的数据（按你前面的接口命名，可调整为你的实际路径）
-export const getAreaCategories = () =>
-  uni.request({ url: `${BASE_URL}/cal_price/area_categories`, method: 'GET' })
+// 获取区域分类
+export const getAreaCategories = () => {
+  return request({
+    url: '/cal_price/area_categories',
+    method: 'GET'
+  })
+}
 
-export const getDistricts = () =>
-  uni.request({ url: `${BASE_URL}/cal_price/districts`, method: 'GET' })
+// 获取地区及子区
+export const getDistricts = () => {
+  return request({
+    url: '/cal_price/districts',
+    method: 'GET'
+  })
+}

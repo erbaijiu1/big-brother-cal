@@ -64,7 +64,7 @@
       </view>
 
       <!-- 过港费 -->
-      <view class="card">
+      <!-- <view class="card">
         <view class="card-head">
           <view class="card-title">过港费（可选）</view>
           <button size="mini" @click="toggleEdit('surcharge')">{{ isEditing.surcharge ? '返回' : '编辑' }}</button>
@@ -82,7 +82,7 @@
           <RuleFeeEditor :key="`surcharge-${form.id ?? 'new'}`" v-model="form.surcharge_fee_rules" dense
             @save="onSectionSaved('surcharge', $event)" />
         </view>
-      </view>
+      </view> -->
 
       <!-- 派送费 -->
       <view class="card">
@@ -128,7 +128,11 @@ import RuleFeeEditor from '@/components/RuleFeeEditor.vue'
 const STRINGIFY_JSON = false
 const transportOptions = ['陆运','空运','海运','快递','其他']
 const warehouseOptions = ['深圳仓','广州仓','东莞仓','香港仓','其他']
-const statusOptions = [{value:0,label:'初始化'},{value:1,label:'启用'},{value:2,label:'停用'}]
+const statusOptions = [
+  {value:0,label:'初始化'},
+  {value:1,label:'启用'},
+  {value:2,label:'停用'}
+]
 
 const props = defineProps({
   modelValue: {
@@ -163,9 +167,10 @@ const channelOptions = computed(() => [
   { channel_code: '', channel_name: '', display: '全部' },
   ...(props.channelList || []).map(x => ({ ...x, display: `${x.channel_code} - ${x.channel_name || ''}` }))
 ])
-const channelIndex = computed(() =>
-  channelOptions.value.findIndex(opt => String(opt.channel_code) === String(form.channel)) || 0
-)
+const channelIndex = computed(() => {
+  const i = channelOptions.value.findIndex(opt => String(opt.channel_code) === String(form.channel))
+  return i >= 0 ? i : 0
+})
 const channelDisplay = computed(() => channelOptions.value[channelIndex.value]?.display || '全部')
 function onChannelChange(e){ form.channel = channelOptions.value[e.detail.value]?.channel_code || '' }
 
@@ -174,9 +179,10 @@ const categoryOptions = computed(() => [
   { category_id: 0, main_category: '全部' },
   ...(props.categoryList || [])
 ])
-const categoryIndex = computed(() =>
-  categoryOptions.value.findIndex(opt => Number(opt.category_id) === Number(form.category_id)) || 0
-)
+const categoryIndex = computed(() => {
+  const i = categoryOptions.value.findIndex(opt => Number(opt.category_id) === Number(form.category_id))
+  return i >= 0 ? i : 0
+})
 const categoryDisplay = computed(() => categoryOptions.value[categoryIndex.value]?.main_category || '全部')
 function onCategoryChange(e){ form.category_id = categoryOptions.value[e.detail.value]?.category_id || 0 }
 
@@ -239,6 +245,7 @@ function normalizeOut(src){
 }
 function hasRules(a){ return Array.isArray(a) && a.length>0 }
 
+/** 修正过的规则展示 */
 function rulesToLines(list = []){
   const groups = { KG: [], CBM: [] }
   ;(list || []).forEach(r=>{
@@ -246,9 +253,19 @@ function rulesToLines(list = []){
     if (r.prize !== undefined && r.prize !== null && r.prize !== '') {
       groups[unit].push({ type:'flat', prize: r.prize })
     } else {
+      // 🟢 修正 range 显示
+      let rangeText = ''
+      if (Array.isArray(r.range)) {
+        rangeText = `${r.range[0]}-${r.range[1]}`
+      } else if (typeof r.range === 'string') {
+        rangeText = r.range.replace(/[\[\]]/g,'').replace(',','-')
+      } else {
+        rangeText = String(r.range || '')
+      }
+
       groups[unit].push({
         type:'tier',
-        range: r.range || '',
+        range: rangeText,
         unit_price: r.unit_price ?? r.price,
         base_fees: r.base_fees ?? r.base_fee,
         deduction_value: r.deduction_value ?? r.deduct
@@ -266,15 +283,17 @@ function rulesToLines(list = []){
     }
     const segs = arr.filter(x=>x.type==='tier').map(x=>{
       const extras = []
-      if (x.base_fees !== undefined && x.base_fees !== '') extras.push(`基 ${x.base_fees}`)
-      if (x.deduction_value !== undefined && x.deduction_value !== '') extras.push(`扣 ${x.deduction_value}`)
-      return `${x.range}:${x.unit_price}${extras.length?`（${extras.join('，')}）`:''}`
+      if (x.base_fees !== undefined && x.base_fees !== '') extras.push(`${x.base_fees}元`)
+      if (x.deduction_value !== undefined && x.deduction_value !== '') extras.push(`含 ${x.deduction_value}`)
+      return `${x.range}:${x.unit_price}(单价)${extras.length?`（${extras.join('，')}）`:''}`
     })
     out.push({ unit: u, text: segs.join('， ') })
   })
   return out
 }
 </script>
+
+
 
 <style scoped>
 .rule-editor-wrap{ padding: 8rpx 12rpx; }

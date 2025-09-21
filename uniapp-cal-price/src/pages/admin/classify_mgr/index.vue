@@ -100,7 +100,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { onPullDownRefresh } from '@dcloudio/uni-app'
-import { BASE_URL } from '@/common/config'
+import { request } from '@/common/utils/request'   // ✅ 统一封装的请求
 
 const list = ref([])
 const total = ref(0)
@@ -116,7 +116,6 @@ const searchFormRef = ref(null)
 // 编辑弹窗
 const editPopup = ref(null)
 const editDialog = reactive({
-  visible: false,
   isEdit: false,
   form: {
     category_id: null,
@@ -133,28 +132,27 @@ const editFormRef = ref(null)
 const editRules = {
   main_category: [{ required: true, errorMessage: '主分类必填', trigger: 'blur' }],
   sub_examples: [{ required: true, errorMessage: '分类示例必填', trigger: 'blur' }],
-  description: [{ required: false, trigger: 'blur' }],       // 写个空规则
+  description: [{ required: false, trigger: 'blur' }],
   temperature_req: [{ required: false, trigger: 'blur' }],
   hazard_level: [{ required: false, trigger: 'blur' }],
   storage_level: [{ required: false, trigger: 'blur' }],
-  priority: [{ required: false, trigger: 'blur' }]
-  ,category_id: []
+  priority: [{ required: false, trigger: 'blur' }],
+  category_id: []
 }
 
 onMounted(() => {
   fetchData()
 })
 
-function fetchData() {
-  uni.request({
-    url: `${BASE_URL}/cal_price/classify_mgr/`,
+/** 列表 */
+async function fetchData() {
+  const res = await request({
+    url: '/cal_price/classify_mgr/',
     method: 'GET',
-    data: { ...query, include_deleted: query.include_deleted ? 1 : 0 },
-    success(res) {
-      list.value = res.data.data
-      total.value = res.data.total
-    }
+    data: { ...query, include_deleted: query.include_deleted ? 1 : 0 }
   })
+  list.value = res?.data || []
+  total.value = res?.total || 0
 }
 
 function resetQuery() {
@@ -175,10 +173,10 @@ function onIncludeDeletedChange(e) {
   fetchData()
 }
 
+/** 编辑弹窗 */
 function showEditDialog(row = null) {
   if (row) {
     editDialog.isEdit = true
-    // 注意类型兼容
     editDialog.form = {
       category_id: row.category_id ?? null,
       main_category: row.main_category ?? '',
@@ -190,7 +188,6 @@ function showEditDialog(row = null) {
       priority: typeof row.priority === 'number' ? row.priority : Number(row.priority) || 99
     }
   } else {
-    // 新建
     editDialog.isEdit = false
     editDialog.form = {
       category_id: null,
@@ -210,87 +207,54 @@ function closeEditDialog() {
   editPopup.value.close()
 }
 
-function saveCategory() {
+async function saveCategory() {
   if (!editFormRef.value) {
     uni.showToast({ title: '表单未初始化', icon: 'none' })
     return
   }
+  try {
+    await editFormRef.value.validate()
 
-  console.log('form:', editDialog.form)
+    const isEdit = editDialog.isEdit
+    const url = isEdit
+      ? `/cal_price/classify_mgr/${editDialog.form.category_id}`
+      : `/cal_price/classify_mgr/`
+    const method = isEdit ? 'PUT' : 'POST'
 
-  editFormRef.value.validate()
-    .then(() => {
-      const isEdit = editDialog.isEdit
-      const apiUrl = isEdit
-        ? `${BASE_URL}/cal_price/classify_mgr/${editDialog.form.category_id}`
-        : `${BASE_URL}/cal_price/classify_mgr/`
-      const method = isEdit ? 'PUT' : 'POST'
-      uni.request({
-        url: apiUrl,
-        method,
-        data: editDialog.form,
-        success(res) {
-          uni.showToast({ title: isEdit ? '保存成功' : '新增成功', icon: 'success' })
-          closeEditDialog()
-          fetchData()
-        },
-        fail() {
-          uni.showToast({ title: isEdit ? '保存失败' : '新增失败', icon: 'error' })
-        }
-      })
-    })
-    .catch(err => {
-      console.log('校验失败', err)
-      uni.showToast({ title: '请检查表单填写', icon: 'none' })
-    })
+    await request({ url, method, data: editDialog.form })
+    uni.showToast({ title: isEdit ? '保存成功' : '新增成功', icon: 'success' })
+    closeEditDialog()
+    fetchData()
+  } catch (err) {
+    console.error('保存失败/校验失败:', err)
+    uni.showToast({ title: '请检查表单填写', icon: 'none' })
+  }
 }
 
-
-function handleDelete(row) {
-  uni.showModal({
-    title: '提示',
-    content: '确定要删除该分类吗？'
-  }).then(res => {
-    if (res.confirm) {
-      uni.request({
-        url: `${BASE_URL}/cal_price/classify_mgr/${row.category_id}`,
-        method: 'DELETE',
-        success() {
-          uni.showToast({ title: '已删除', icon: 'success' })
-          fetchData()
-        }
-      })
-    }
-  })
+/** 删除 / 恢复 */
+async function handleDelete(row) {
+  const res = await uni.showModal({ title: '提示', content: '确定要删除该分类吗？' })
+  if (res.confirm) {
+    await request({ url: `/cal_price/classify_mgr/${row.category_id}`, method: 'DELETE' })
+    uni.showToast({ title: '已删除', icon: 'success' })
+    fetchData()
+  }
 }
 
-function handleRecover(row) {
-  uni.request({
-    url: `${BASE_URL}/cal_price/classify_mgr/recover/${row.category_id}`,
-    method: 'POST',
-    success() {
-      uni.showToast({ title: '已恢复', icon: 'success' })
-      fetchData()
-    }
-  })
+async function handleRecover(row) {
+  await request({ url: `/cal_price/classify_mgr/recover/${row.category_id}`, method: 'POST' })
+  uni.showToast({ title: '已恢复', icon: 'success' })
+  fetchData()
 }
 
-// 下拉刷新
+/** 下拉刷新 */
 onPullDownRefresh(() => {
   fetchData()
   uni.stopPullDownRefresh()
 })
 
-function onShow() {
-  const token = uni.getStorageSync('token')
-  if (!token) {
-    uni.redirectTo({ url: '/pages/login/index' })
-  }
-}
-
-
-
 </script>
+
 
 <style>
 /* ===== 公共容器 & 搜索 ===== */

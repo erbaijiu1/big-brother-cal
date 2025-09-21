@@ -38,7 +38,7 @@ async def get_best_quotes(data: QuoteRequest):
                     , "remark": channel_conf.remark if channel_conf else ""
                     , "fee_details": fee_details
                 })
-                logger.info(f"Quote for channel {rule.channel} is {total_price}")
+                logger.info(f"Quote for channel {rule.channel} is {total_price}, fees:{fee_details}")
             except Exception as e:
                 logger.error(f"Failed to calculate quote for channel {rule.channel}, rule_id:{rule.id}: {e}", exc_info=True)
 

@@ -109,3 +109,38 @@ def recover_pricing(id: int, db: Session = Depends(get_db)):
     obj.status = 1  # 恢复为正常
     db.commit()
     return {"msg": "已恢复该计费规则"}
+
+@router.put("/{id}", summary="更新计费规则")
+def update_pricing(id: int, model: PricingRuleCreate, db: Session = Depends(get_db)):
+    obj = db.query(PricingRule).filter(PricingRule.id == id).first()
+    if not obj:
+        raise HTTPException(404, "计费规则不存在")
+
+    # 校验 channel_code
+    if not db.query(ChannelConfig).filter(ChannelConfig.channel_code == model.channel).first():
+        raise HTTPException(400, f"渠道编码 {model.channel} 不存在")
+    # 校验 category_id
+    if not db.query(GoodsClassification).filter(GoodsClassification.category_id == model.category_id).first():
+        raise HTTPException(400, f"商品分类ID {model.category_id} 不存在")
+
+    # 更新对象属性
+    obj.category_id = model.category_id
+    obj.channel = model.channel
+    obj.transport_method = model.transport_method
+    obj.warehouse = model.warehouse
+    obj.min_consumption = model.min_consumption
+    obj.unit_price_rules = json.dumps(model.unit_price_rules, ensure_ascii=False)
+    obj.discount_price = model.discount_price
+    obj.surcharge_fee_rules = json.dumps(model.surcharge_fee_rules, ensure_ascii=False)
+    obj.delivery_fee_rules = json.dumps(model.delivery_fee_rules, ensure_ascii=False)
+    obj.delivery_time = model.delivery_time
+    obj.packaging_requirement = model.packaging_requirement
+    obj.remark = model.remark
+    obj.compensation_policy = model.compensation_policy
+    obj.status = model.status
+    obj.filter_rules = json.dumps(model.filter_rules, ensure_ascii=False)
+
+    db.commit()
+    db.refresh(obj)
+    return {"id": obj.id}
+

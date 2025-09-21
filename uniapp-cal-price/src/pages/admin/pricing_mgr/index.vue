@@ -89,7 +89,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { onPullDownRefresh } from '@dcloudio/uni-app'
-import { BASE_URL } from '@/common/config'
+import { request } from '@/common/utils/request'   // ✅ 统一封装请求
 import RuleViewer from '@/components/RuleViewer.vue'
 import RuleEditor from '@/components/RuleEditor.vue'
 
@@ -123,20 +123,13 @@ function toArr(val) {
 }
 
 /** 渠道/分类获取 */
-function fetchChannelList() {
-  uni.request({
-    url: `${BASE_URL}/cal_price/channel_mgr/`,
-    method: 'POST',
-    data: {},
-    success(res) { channelList.value = res.data?.data || [] }
-  })
+async function fetchChannelList() {
+  const res = await request({ url: '/cal_price/channel_mgr/', method: 'POST', data: {} })
+  channelList.value = res?.data || []
 }
-function fetchCategoryList() {
-  uni.request({
-    url: `${BASE_URL}/cal_price/classify_mgr/`,
-    method: 'GET',
-    success(res) { categoryList.value = res.data?.data || [] }
-  })
+async function fetchCategoryList() {
+  const res = await request({ url: '/cal_price/classify_mgr/', method: 'GET' })
+  categoryList.value = res?.data || []
 }
 
 /** 表格行展示 */
@@ -155,22 +148,20 @@ function getCategoryName(id) {
 onMounted(() => { fetchChannelList(); fetchCategoryList(); fetchData() })
 
 /** 列表请求 */
-function fetchData() {
-  uni.request({
-    url: `${BASE_URL}/cal_price/pricing_mgr/`,
+async function fetchData() {
+  const res = await request({
+    url: '/cal_price/pricing_mgr/',
     method: 'GET',
-    data: { ...query, include_deleted: query.include_deleted ? 1 : 0 },
-    success(res) {
-      const arr = res.data?.data || []
-      list.value = arr.map(item => ({
-        ...item,
-        unit_price_rules: toArr(item.unit_price_rules),
-        surcharge_fee_rules: toArr(item.surcharge_fee_rules),
-        delivery_fee_rules: toArr(item.delivery_fee_rules),
-      }))
-      total.value = res.data?.total || 0
-    }
+    data: { ...query, include_deleted: query.include_deleted ? 1 : 0 }
   })
+  const arr = res?.data || []
+  list.value = arr.map(item => ({
+    ...item,
+    unit_price_rules: toArr(item.unit_price_rules),
+    surcharge_fee_rules: toArr(item.surcharge_fee_rules),
+    delivery_fee_rules: toArr(item.delivery_fee_rules),
+  }))
+  total.value = res?.total || 0
 }
 
 /** 查询区交互 */
@@ -197,7 +188,6 @@ const channelIndex = computed(() => {
   return Math.max(0, i)
 })
 const channelDisplay = computed(() => channelOptions.value[channelIndex.value]?.display || '全部')
-
 function onChannelChange(e) { query.channel = channelOptions.value[e.detail.value]?.channel_code || '' }
 
 /** ==== 分类选择 ==== */
@@ -261,54 +251,37 @@ function showEditDialog(row = null) {
 function closeEditDialog() { editPopup.value.close() }
 
 /** 保存 */
-function onSaveFromChild(payload) {
+async function onSaveFromChild(payload) {
   const url = payload.id
-    ? `${BASE_URL}/cal_price/pricing_mgr/${payload.id}`
-    : `${BASE_URL}/cal_price/pricing_mgr/`
+    ? `/cal_price/pricing_mgr/${payload.id}`
+    : `/cal_price/pricing_mgr/`
   const method = payload.id ? 'PUT' : 'POST'
 
-  uni.request({
-    url, method, data: payload,
-    success() {
-      uni.showToast({ title: '保存成功', icon: 'success' })
-      closeEditDialog()
-      fetchData()
-    }
-  })
+  await request({ url, method, data: payload })
+  uni.showToast({ title: '保存成功', icon: 'success' })
+  closeEditDialog()
+  fetchData()
 }
 
 /** 删除/恢复 */
-function handleDelete(row) {
-  uni.showModal({
-    title: '提示',
-    content: '确定要删除该规则吗？'
-  }).then(res => {
-    if (res.confirm) {
-      uni.request({
-        url: `${BASE_URL}/cal_price/pricing_mgr/${row.id}`,
-        method: 'DELETE',
-        success() {
-          uni.showToast({ title: '删除成功', icon: 'success' })
-          fetchData()
-        }
-      })
-    }
-  })
+async function handleDelete(row) {
+  const res = await uni.showModal({ title: '提示', content: '确定要删除该规则吗？' })
+  if (res.confirm) {
+    await request({ url: `/cal_price/pricing_mgr/${row.id}`, method: 'DELETE' })
+    uni.showToast({ title: '删除成功', icon: 'success' })
+    fetchData()
+  }
 }
-function handleRecover(row) {
-  uni.request({
-    url: `${BASE_URL}/cal_price/pricing_mgr/recover/${row.id}`,
-    method: 'POST',
-    success() {
-      uni.showToast({ title: '恢复成功', icon: 'success' })
-      fetchData()
-    }
-  })
+async function handleRecover(row) {
+  await request({ url: `/cal_price/pricing_mgr/recover/${row.id}`, method: 'POST' })
+  uni.showToast({ title: '恢复成功', icon: 'success' })
+  fetchData()
 }
 
 /** 下拉刷新 */
 onPullDownRefresh(() => { fetchData(); uni.stopPullDownRefresh() })
 </script>
+
 
 <style>
 .container {

@@ -26,7 +26,12 @@
 		  {
 			"path": "district/index",
 			"style": { "navigationBarTitleText": "地区管理" }
+		  },
+		  {
+			"path": "user_mgr/index",
+			"style": { "navigationBarTitleText": "用户管理" }
 		  }
+
 		]
 	  }
 	],

@@ -98,10 +98,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import SurchargeEditor from '@/components/SurchargeEditor.vue'
 import SurchargeSummary from '@/components/SurchargeSummary.vue'
-
 import { onPullDownRefresh } from '@dcloudio/uni-app'
-// import { showToast, showModal } from '@/common/utils/uniApi' // 可直接用 uni.showToast/uni.showModal
-import { BASE_URL } from '@/common/config'
+import { request } from '@/common/utils/request'   // ✅ 引入封装过的 request
 
 const list = ref([])
 const total = ref(0)
@@ -113,60 +111,42 @@ const query = reactive({
 })
 
 const searchFormRef = ref(null)
-
-// —— 名称映射（给摘要组件更好地显示用，可选）——
 const nameMaps = reactive({
-  areaCatsById: {}, // { [id]: name }
-  distsById: {},    // { [id]: name_cn }
-  subsById: {}      // { [id]: `${district}·${name_cn}` }
+  areaCatsById: {},
+  distsById: {},
+  subsById: {}
 })
-
-
 
 // 编辑弹窗
 const editPopup = ref(null)
 const editDialog = reactive({
-  visible: false, // 实际用 popup 控制，不直接用
   isEdit: false,
-  form: {
-    id: null,
-    channel_code: '',
-    channel_name: '',
-    remark: ''
-  }
+  form: { id: null, channel_code: '', channel_name: '', remark: '' }
 })
 const editFormRef = ref(null)
 const editRules = {
-  channel_code: [
-    { required: true, errorMessage: '渠道编码必填', trigger: 'blur' }
-  ],
-  channel_name: [
-    { required: true, errorMessage: '渠道名称必填', trigger: 'blur' }
-  ],
-  remark: []  // 不校验也要写空数组
+  channel_code: [{ required: true, errorMessage: '渠道编码必填' }],
+  channel_name: [{ required: true, errorMessage: '渠道名称必填' }],
+  remark: []
 }
 
-onMounted(() => {
-  fetchData()
-})
+onMounted(() => { fetchData(); preloadNameMaps() })
 
-function fetchData() {
-  uni.request({
-    url: `${BASE_URL}/cal_price/channel_mgr/`,
+// ===== 数据请求 =====
+async function fetchData() {
+  const res = await request({
+    url: '/cal_price/channel_mgr/',
     method: 'POST',
-    data: { ...query },
-    success(res) {
-      list.value = (res.data.data || []).map(row => {
-        // 尽量解析为对象，失败保持原样
-        let rules = row.surcharge_rules
-        if (typeof rules === 'string') {
-          try { rules = JSON.parse(rules || '{}') } catch (e) { rules = {} }
-        }
-        return { ...row, surcharge_rules: rules }
-      })
-      total.value = res.data.total
-    }
+    data: { ...query }
   })
+  list.value = (res.data || []).map(row => {
+    let rules = row.surcharge_rules
+    if (typeof rules === 'string') {
+      try { rules = JSON.parse(rules || '{}') } catch { rules = {} }
+    }
+    return { ...row, surcharge_rules: rules }
+  })
+  total.value = res.total || 0
 }
 
 function resetQuery() {
@@ -175,152 +155,90 @@ function resetQuery() {
   query.include_deleted = false
   fetchData()
 }
-
 function onPageChange(e) {
   query.page = e.current
   query.page_size = e.pageSize
   fetchData()
 }
 
+// ===== 编辑弹窗 =====
 function showEditDialog(row = null) {
   if (row) {
-    // 编辑
     editDialog.isEdit = true
     editDialog.form = { ...row }
   } else {
-    // 新建
     editDialog.isEdit = false
     editDialog.form = { id: null, channel_code: '', channel_name: '', remark: '' }
   }
   editPopup.value.open()
 }
+function closeEditDialog() { editPopup.value.close() }
 
-function closeEditDialog() {
-  editPopup.value.close()
-}
-
-function saveChannel() {
-  // 增加判空检查
-  if (!editFormRef.value) {
-    uni.showToast({ title: '表单未初始化', icon: 'none' })
-    return
-  }
-    // console.log("value:", editFormRef.value)
-  editFormRef.value.validate()
-    .then(res => {
-      // 验证通过
-      let req
-      if (editDialog.isEdit) {
-        req = uni.request({
-          url: `${BASE_URL}/cal_price/channel_mgr/${editDialog.form.id}`,
-          method: 'PUT',
-          data: editDialog.form,
-          success(res) {
-            uni.showToast({ title: '保存成功', icon: 'success' })
-            closeEditDialog()
-            fetchData()
-          },
-          fail() {
-            uni.showToast({ title: '保存失败', icon: 'error' })
-          }
-        })
-      } else {
-        req = uni.request({
-          url: `${BASE_URL}/cal_price/channel_mgr/add`,
-          method: 'POST',
-          data: editDialog.form,
-          success(res) {
-            uni.showToast({ title: '保存成功', icon: 'success' })
-            closeEditDialog()
-            fetchData()
-          },
-          fail() {
-            uni.showToast({ title: '保存失败', icon: 'error' })
-          }
-        })
-      }
-    })
-    .catch(err => {
-      // 验证失败
-      console.error('表单验证失败:', err)
-      uni.showToast({ title: '请检查表单填写', icon: 'none' })
-    })
-}
-
-function handleDelete(row) {
-  uni.showModal({
-    title: '提示',
-    content: '确定要删除该渠道吗？'
-  }).then(res => {
-    if (res.confirm) {
-      uni.request({
-        url: `${BASE_URL}/cal_price/channel_mgr/${row.id}`,
-        method: 'DELETE',
-        success() {
-          uni.showToast({ title: '删除成功', icon: 'success' })
-          fetchData()
-        }
+async function saveChannel() {
+  try {
+    await editFormRef.value.validate()
+    if (editDialog.isEdit) {
+      await request({
+        url: `/cal_price/channel_mgr/${editDialog.form.id}`,
+        method: 'PUT',
+        data: editDialog.form
+      })
+    } else {
+      await request({
+        url: '/cal_price/channel_mgr/add',
+        method: 'POST',
+        data: editDialog.form
       })
     }
-  })
+    uni.showToast({ title: '保存成功', icon: 'success' })
+    closeEditDialog()
+    fetchData()
+  } catch (err) {
+    console.error(err)
+    uni.showToast({ title: '请检查表单填写', icon: 'none' })
+  }
 }
 
-function handleRecover(row) {
-  uni.request({
-    url: `${BASE_URL}/cal_price/channel_mgr/recover/${row.id}`,
-    method: 'POST',
-    success() {
-      uni.showToast({ title: '恢复成功', icon: 'success' })
-      fetchData()
-    }
-  })
+async function handleDelete(row) {
+  const res = await uni.showModal({ title: '提示', content: '确定要删除该渠道吗？' })
+  if (res.confirm) {
+    await request({ url: `/cal_price/channel_mgr/${row.id}`, method: 'DELETE' })
+    uni.showToast({ title: '删除成功', icon: 'success' })
+    fetchData()
+  }
 }
 
-// 下拉刷新
-onPullDownRefresh(() => {
-  fetchData()
-  uni.stopPullDownRefresh()
-})
-
-
-function onIncludeDeletedChange(e) {
-  query.include_deleted = !!e.detail.value
+async function handleRecover(row) {
+  await request({ url: `/cal_price/channel_mgr/recover/${row.id}`, method: 'POST' })
+  uni.showToast({ title: '恢复成功', icon: 'success' })
   fetchData()
 }
 
+// ===== 其它 =====
+onPullDownRefresh(() => { fetchData(); uni.stopPullDownRefresh() })
+function onIncludeDeletedChange(e) { query.include_deleted = !!e.detail.value; fetchData() }
 
 const surchargeRef = ref(null)
 function openSurcharge(row) {
-  if (!row?.id) return uni.showToast({ title: '请先保存渠道', icon:'none' })
-  // 传第二个参数可减少一次网络请求；没有也行
-  const payload = row.surcharge_rules && row.surcharge_rules.surcharges ? row.surcharge_rules : null
+  if (!row?.id) return uni.showToast({ title: '请先保存渠道', icon: 'none' })
+  const payload = row.surcharge_rules?.surcharges ? row.surcharge_rules : null
   surchargeRef.value.open(row.id, payload)
 }
 
+async function preloadNameMaps() {
+  const areas = await request({ url: '/cal_price/area_categories', method: 'GET' })
+  ;(areas || []).forEach(c => { nameMaps.areaCatsById[c.id] = c.name })
 
-function preloadNameMaps() {
-  // 你已有接口的话直接替换为你的 api：
-  uni.request({ url: `${BASE_URL}/cal_price/area_categories`, method: 'GET',
-    success(res) {
-      (res.data || []).forEach(c => { nameMaps.areaCatsById[c.id] = c.name })
-    }
-  })
-  uni.request({ url: `${BASE_URL}/cal_price/districts`, method: 'GET',
-    success(res) {
-      (res.data || []).forEach(d => {
-        nameMaps.distsById[d.id] = d.name_cn
-        ;(d.subs || []).forEach(s => {
-          nameMaps.subsById[s.id] = `${d.name_cn}·${s.name_cn}`
-        })
-      })
-    }
+  const dists = await request({ url: '/cal_price/districts', method: 'GET' })
+  ;(dists || []).forEach(d => {
+    nameMaps.distsById[d.id] = d.name_cn
+    ;(d.subs || []).forEach(s => {
+      nameMaps.subsById[s.id] = `${d.name_cn}·${s.name_cn}`
+    })
   })
 }
-
-onMounted(preloadNameMaps)
-
-
 </script>
+
 
 <style>
 /* ===== 公共容器 & 搜索 ===== */

@@ -16,19 +16,19 @@
         </view>
       </view>
 
-      <view class="row">
-        <text class="label">计价类型</text>
+      <!-- <view class="row">
+        <text class="label">计价方式</text>
         <view class="radios">
           <label class="radio" @click="setMode('tiered')" :aria-checked="curr.mode === 'tiered'" role="radio">
             <view class="dot" :class="{ on: curr.mode === 'tiered' }"></view>
-            <text>区间价</text>
+            <text>区间单价</text>
           </label>
           <label class="radio" @click="setMode('flat')" :aria-checked="curr.mode === 'flat'" role="radio">
             <view class="dot" :class="{ on: curr.mode === 'flat' }"></view>
-            <text>单价</text>
+            <text>一口价</text>
           </label>
         </view>
-      </view>
+      </view> -->
     </view>
 
 
@@ -41,10 +41,10 @@
     <!-- 区间价 -->
     <template v-else>
       <view class="thead sticky">
-        <text class="col-range">区间</text>
+        <text class="col-range">区间范围</text>
         <text class="col-price">单价(/{{ activeUnit }})</text>
-        <text class="col-base">基础费</text>
-        <text class="col-deduct">扣减</text>
+        <text class="col-base">基础费(最低)</text>
+        <text class="col-deduct">包多少</text>
         <text class="col-action"></text>
       </view>
 
@@ -98,7 +98,7 @@ function pickUnit(obj, def='KG'){
   const raw = firstNonNil(
     obj,
     'prize_type','unit','unit_type','price_unit','type',
-    '计价类型','单位','danwei','dw'
+    '计价方式','单位','danwei','dw'
   )
   const u = toUpper(raw, def)
   if (u.includes('KG')) return 'KG'
@@ -249,7 +249,7 @@ function save(){
 
   const problems = [
     ...validateTierCoverageAndOverlap(state.KG, 'KG'),
-    ...validateTierCoverageAndOverlap(state.CBM, 'CBM'),
+    // ...validateTierCoverageAndOverlap(state.CBM, 'CBM'),
   ]
   if (problems.length){ uni.showToast({ title: problems[0], icon: 'none' }); return }
 
