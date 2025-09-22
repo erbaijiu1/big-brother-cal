@@ -1,37 +1,44 @@
+// /src/common/utils/request.js
 import { BASE_URL } from '@/common/config'
+
+function prune(obj) {
+  if (!obj || typeof obj !== 'object') return obj
+  const out = {}
+  Object.keys(obj).forEach(k => {
+    const v = obj[k]
+    // 这里我把 undefined / null / '' 都去掉；如果你有查询必须传空字符串的场景，可以按需调整
+    if (v !== undefined && v !== null && v !== '') out[k] = v
+  })
+  return out
+}
 
 export function request(options) {
   return new Promise((resolve, reject) => {
-    // 判断是否要拼 BASE_URL
-    const finalUrl = options.url.startsWith("http")
-      ? options.url
-      : BASE_URL + options.url
+    const finalUrl = options.url.startsWith('http') ? options.url : BASE_URL + options.url
+    const method = (options.method || 'GET').toUpperCase()
+
+    const data = method === 'GET'
+      ? prune(options.data || {})  // ★★★ 关键：GET 参数剔除空值
+      : (options.data || {})
 
     uni.request({
       url: finalUrl,
-      method: options.method || "GET",
-      data: options.data || {},
+      method,
+      data,
       header: {
-        "Authorization": "Bearer " + uni.getStorageSync("token"),
+        'Authorization': 'Bearer ' + uni.getStorageSync('token'),
         ...(options.header || {})
       },
       success(res) {
         if (res.statusCode === 401) {
-          // === 统一处理未登录 ===
-          uni.removeStorageSync("token")
-          uni.reLaunch({ url: "/pages/login/index" })
+          uni.removeStorageSync('token')
+          // 确保路径与你项目实际一致
+          uni.reLaunch({ url: '/pages/login/index' })
           return
         }
         resolve(res.data)
       },
-      fail(err) {
-        reject(err)
-      }
+      fail(err) { reject(err) }
     })
   })
-}
-
-function logout() {
-  uni.removeStorageSync('token')
-  uni.redirectTo({ url: '/pages/login/index' })
 }

@@ -172,8 +172,8 @@ function fetchCats () {
 
 function fetchSubs () {
   getDistricts().then(res => {
-    subsAll.value = res.data.flatMap(d =>
-      d.subs.map(s => ({
+    subsAll.value = (res.data || []).flatMap(d =>
+      (d.subs || []).map(s => ({
         id: s.id,
         district_id: d.id,
         district_cn: d.name_cn,
