@@ -167,12 +167,16 @@ function saveBind () {
 
 /* ------------------ 初始化 ------------------ */
 function fetchCats () {
-  getCats().then(res => (cats.value = res.data))
+  getCats().then(res => {
+    console.log('获取类别列表成功:', res) // ← 这是一个数组
+    cats.value = Array.isArray(res) ? res : (res?.data ?? [])
+  }).catch(err => console.error('获取类别列表失败:', err))
 }
 
 function fetchSubs () {
   getDistricts().then(res => {
-    subsAll.value = (res.data || []).flatMap(d =>
+    const arr = Array.isArray(res) ? res : (res?.data ?? [])
+    subsAll.value = arr.flatMap(d =>
       (d.subs || []).map(s => ({
         id: s.id,
         district_id: d.id,

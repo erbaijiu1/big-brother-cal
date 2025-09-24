@@ -8,9 +8,9 @@ from db.sqlalchemy_define import get_db
 from typing import Optional
 import json
 
-router = APIRouter(prefix="/pricing_mgr", tags=["计费规则管理"])
-# router = APIRouter(prefix="/pricing_mgr", tags=["计费规则管理"]
-#                    , dependencies=[Depends(jwt_auth)])
+# router = APIRouter(prefix="/pricing_mgr", tags=["计费规则管理"])
+router = APIRouter(prefix="/pricing_mgr", tags=["计费规则管理"]
+                   , dependencies=[Depends(jwt_auth)])
 
 @router.get("/", summary="计费规则分页列表")
 async def list_pricing(

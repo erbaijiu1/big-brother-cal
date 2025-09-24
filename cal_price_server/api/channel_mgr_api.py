@@ -6,11 +6,12 @@ from pydantic import model_validator
 import json
 import time
 
+from api.login import jwt_auth
 from api_model.api_request import ChannelQuery
 from db.db_models import ChannelConfig, AreaCategory, AreaCategoryMap, District, SubDistrict
 from db.sqlalchemy_define import get_db
 
-router = APIRouter(prefix="/channel_mgr", tags=["渠道管理"])
+router = APIRouter(prefix="/channel_mgr", tags=["渠道管理"], dependencies=[Depends(jwt_auth)] )
 
 # ==============================
 # 一、工具：安全 JSON 解析 / 序列化

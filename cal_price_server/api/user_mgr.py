@@ -40,12 +40,19 @@ class AdminUserResponse(BaseModel):
         orm_mode = True
 
 
+# ==== 超级管理员验证依赖 ====
+def super_admin_required(payload: dict = Depends(jwt_auth)):
+    if payload.get("username") != "big_admin":
+        raise HTTPException(403, "只有超级管理员可以访问此接口")
+    return payload
+
+
 # ==== 管理员用户管理 ====
 @router.post("/", response_model=AdminUserResponse, summary="创建管理员用户")
 def create_admin_user(
     user: AdminUserCreate,
     db: Session = Depends(get_db),
-    payload: dict = Depends(jwt_auth)
+    payload: dict = Depends(super_admin_required)
 ):
     existing_user = db.query(AdminUser).filter(AdminUser.username == user.username).first()
     if existing_user:
@@ -71,7 +78,7 @@ def list_admin_users(
     username: Optional[str] = None,
     status: Optional[str] = Query(None),  # ★ 接收为 str，更宽容
     db: Session = Depends(get_db),
-    payload: dict = Depends(jwt_auth)
+    payload: dict = Depends(super_admin_required)
 ):
     query = db.query(AdminUser)
 
@@ -91,7 +98,7 @@ def list_admin_users(
     return {"total": total, "items": users}
 
 @router.get("/{user_id}", response_model=AdminUserResponse, summary="获取管理员用户详情")
-def get_admin_user(user_id: int, db: Session = Depends(get_db), payload: dict = Depends(jwt_auth)):
+def get_admin_user(user_id: int, db: Session = Depends(get_db), payload: dict = Depends(super_admin_required)):
     user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if not user:
         raise HTTPException(404, "用户不存在")
@@ -103,7 +110,7 @@ def update_admin_user(
     user_id: int,
     user_update: AdminUserUpdate,
     db: Session = Depends(get_db),
-    payload: dict = Depends(jwt_auth)
+    payload: dict = Depends(super_admin_required)
 ):
     db_user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if not db_user:
@@ -120,7 +127,7 @@ def update_admin_user(
 
 
 @router.delete("/{user_id}", summary="删除管理员用户")
-def delete_admin_user(user_id: int, db: Session = Depends(get_db), payload: dict = Depends(jwt_auth)):
+def delete_admin_user(user_id: int, db: Session = Depends(get_db), payload: dict = Depends(super_admin_required)):
     db_user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
     if not db_user:
         raise HTTPException(404, "用户不存在")

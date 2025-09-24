@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from api.login import jwt_auth
 from api_model.api_district import DistrictOut, DistrictCreate, SubDistrictOut, SubDistrictCreate, SubDistrictUpdate
 from db.db_models import District, SubDistrict
 from db.sqlalchemy_define import get_db
 
-router = APIRouter(prefix="/districts", tags=["District"])
+router = APIRouter(prefix="/districts", tags=["District"], dependencies=[Depends(jwt_auth)])
 
 @router.post("/", response_model=DistrictOut)
 def create_district(data: DistrictCreate, db: Session = Depends(get_db)):

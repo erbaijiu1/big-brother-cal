@@ -4,8 +4,10 @@ from typing import List
 from api_model.api_district import AreaCategoryOut, AreaCategoryCreate
 from db.db_models import AreaCategory, AreaCategoryMap
 from db.sqlalchemy_define import get_db
+from api.login import jwt_auth  # 添加jwt_auth导入
 
-router = APIRouter(prefix="/area_categories", tags=["AreaCategory"])
+# 修改router定义，添加依赖
+router = APIRouter(prefix="/area_categories", tags=["AreaCategory"], dependencies=[Depends(jwt_auth)])
 
 # ---------- 类别 CRUD ----------
 @router.get("/", response_model=List[AreaCategoryOut])

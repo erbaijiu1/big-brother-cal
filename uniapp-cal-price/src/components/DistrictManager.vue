@@ -29,18 +29,18 @@
     </view>
 
     <!-- 弹窗表单（行政区 / 子区 共用） -->
-    <uni-popup ref="popup" type="dialog" :style="{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }">
-      <view class="form" style="background-color: white; border-radius: 8rpx; padding: 32rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.1);">
+    <uni-popup ref="popup" type="dialog">
+      <view class="form">
         <view class="form-item">
           <input v-model.trim="form.name_cn" placeholder="中文名" class="input" />
         </view>
         <view class="form-item">
           <input v-model.trim="form.name_en" placeholder="英文名" class="input" />
         </view>
-        <!-- <view v-if="popupMode === 'sub'" class="form-item remote-box">
+        <view v-if="popupMode === 'sub'" class="form-item remote-box">
           <text>是否偏远区</text>
           <switch v-model="form.is_remote" />
-        </view> -->
+        </view>
         <view class="actions">
           <button size="mini" @click="popup.close">取消</button>
           <button size="mini" type="primary" @click="save">保存</button>
@@ -77,7 +77,10 @@ onMounted(fetchData)
 
 function fetchData () {
   getDistricts().then(res => {
-    districts.value = res.data
+    console.log('res', res)               // [ {...}, {...}, ... ]
+    districts.value = Array.isArray(res)  // ✅ 兼容两种返回
+      ? res
+      : (res?.data ?? [])
   })
 }
 

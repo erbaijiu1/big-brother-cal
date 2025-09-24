@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from api.login import jwt_auth
 from db.db_models import GoodsClassification
 from db.sqlalchemy_define import get_db
 from typing import Optional
 
-router = APIRouter(prefix="/classify_mgr", tags=["分类管理"])
+router = APIRouter(prefix="/classify_mgr", tags=["分类管理"], dependencies=[Depends(jwt_auth)])
 
 @router.get("/", summary="分类分页列表")
 def list_goods(
