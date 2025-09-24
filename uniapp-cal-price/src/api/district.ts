@@ -3,7 +3,7 @@ import { request } from '@/common/utils/request'
 // 获取所有行政区（含子区）
 export const getDistricts = () => {
   return request({
-    url: '/cal_price/districts',
+    url: '/cal_price/districts/',
     method: 'GET'
   })
 }
@@ -11,7 +11,7 @@ export const getDistricts = () => {
 // 新增行政区
 export const createDistrict = (data) => {
   return request({
-    url: '/cal_price/districts',
+    url: '/cal_price/districts/',
     method: 'POST',
     data
   })

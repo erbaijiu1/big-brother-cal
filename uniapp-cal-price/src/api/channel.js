@@ -28,7 +28,7 @@ export const getAreaCategories = () => {
 // 获取地区及子区
 export const getDistricts = () => {
   return request({
-    url: '/cal_price/districts',
+    url: '/cal_price/districts/',
     method: 'GET'
   })
 }

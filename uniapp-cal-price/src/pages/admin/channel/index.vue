@@ -226,10 +226,10 @@ function openSurcharge(row) {
 }
 
 async function preloadNameMaps() {
-  const areas = await request({ url: '/cal_price/area_categories', method: 'GET' })
+  const areas = await request({ url: '/cal_price/area_categories/', method: 'GET' })
   ;(areas || []).forEach(c => { nameMaps.areaCatsById[c.id] = c.name })
 
-  const dists = await request({ url: '/cal_price/districts', method: 'GET' })
+  const dists = await request({ url: '/cal_price/districts/', method: 'GET' })
   ;(dists || []).forEach(d => {
     nameMaps.distsById[d.id] = d.name_cn
     ;(d.subs || []).forEach(s => {

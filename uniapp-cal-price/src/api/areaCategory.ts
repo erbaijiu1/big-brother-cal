@@ -13,14 +13,14 @@ export interface SubIds {
 // 类别
 export const getCats = () => {
   return request({
-    url: '/cal_price/area_categories',
+    url: '/cal_price/area_categories/',
     method: 'GET'
   })
 }
 
 export const addCat = (data: CategoryData) => {
   return request({
-    url: '/cal_price/area_categories',
+    url: '/cal_price/area_categories/',
     method: 'POST',
     data
   })
