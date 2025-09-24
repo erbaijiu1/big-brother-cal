@@ -30,7 +30,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { request } from '@/common/utils/request.js' // ✅ 使用统一封装
+import { request } from '@/common/utils/request' // ✅ 使用统一封装
 
 // ===== 若你后端已拆分：用 /auth/login =====
 const LOGIN_API = '/cal_price/auth/login'
