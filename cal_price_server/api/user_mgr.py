@@ -7,6 +7,7 @@ from passlib.hash import bcrypt
 from db.db_models import AdminUser
 from db.sqlalchemy_define import get_db
 from api.login import jwt_auth  # 依赖验证
+from utils.logger_config import logger
 
 router = APIRouter(prefix="/admin_user", tags=["管理员管理"])
 
@@ -42,7 +43,9 @@ class AdminUserResponse(BaseModel):
 
 # ==== 超级管理员验证依赖 ====
 def super_admin_required(payload: dict = Depends(jwt_auth)):
-    if payload.get("username") != "big_admin":
+    user_name = payload.get("sub")
+    if user_name != "big_admin":
+        logger.error(f"用户权限不足, user_name:{user_name}, payload:{ payload}")
         raise HTTPException(403, "只有超级管理员可以访问此接口")
     return payload
 

@@ -38,16 +38,16 @@ function goPage(url) {
 }
 
 // 进入页面或从后台返回前台时触发
-onShow(() => {
-  const token = uni.getStorageSync('token')
-  if (!token) {
-    // 用 reLaunch 清栈，防止返回到受限页
-    uni.reLaunch({ url: '/pages/login/index' })
-    return
-  }
-  // 刷新欢迎语
-  nickname.value = uni.getStorageSync('nickname') || ''
-})
+// onShow(() => {
+//   const token = uni.getStorageSync('token')
+//   if (!token) {
+//     // 用 reLaunch 清栈，防止返回到受限页
+//     uni.reLaunch({ url: '/pages/login/index' })
+//     return
+//   }
+//   // 刷新欢迎语
+//   nickname.value = uni.getStorageSync('nickname') || ''
+// })
 </script>
 
 
