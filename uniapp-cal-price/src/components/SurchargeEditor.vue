@@ -123,7 +123,6 @@
                 <checkbox-group :value="pickedIds" @change="onPickChange">
                   <scroll-view scroll-y class="chooser-list">
                     <label v-for="opt in filteredOptions" :key="opt.id" class="opt">
-                      <!-- value 必须是字符串；checked 让 UI 与 pickedIds 对齐 -->
                       <checkbox :value="String(opt.id)" :checked="pickedIds.includes(String(opt.id))" />
                       <text class="name">{{ opt.name }}</text>
                       <text v-if="opt.parent" class="parent">（{{ opt.parent }}）</text>
@@ -131,9 +130,23 @@
                   </scroll-view>
                 </checkbox-group>
 
-                <view class="picked">
-                  <text>已选：{{ pickedIds.length }} 个</text>
-                </view>
+                <!-- 统计条 -->
+<view class="picked-bar">
+  <text>已选：{{ pickedIds.length }} / {{ totalOptionsCount }} 个</text>
+  <view class="picked-actions">
+    <text class="link" @click="toggleShowPicked">{{ showPicked ? '收起' : '查看' }}</text>
+    <text class="link danger" v-if="pickedIds.length" @click="clearPicked">清空</text>
+  </view>
+</view>
+
+<!-- 已选项（可展开为标签，支持单个移除） -->
+<view v-if="showPicked && pickedList.length" class="picked-chips">
+  <view class="chip" v-for="item in pickedList" :key="item.id">
+    <text class="chip-text">{{ item.name }}</text>
+    <text class="chip-close" @click="removePicked(item.id)">×</text>
+  </view>
+</view>
+
               </view>
 
 
@@ -225,7 +238,8 @@ function open(id, initialPayload = null) {
     form.surcharges = JSON.parse(JSON.stringify(initialPayload.surcharges))
   } else {
     getChannelSurcharges(id).then(res => {
-      form.surcharges = (res.data?.surcharges) || []
+      console.log('getChannelSurcharges ->', res)
+      form.surcharges = (res?.surcharges) || []
     })
   }
   popup.value.open()
@@ -259,9 +273,24 @@ function editRule(idx) {
 }
 
 function onPickChange(e) {
-  // e.detail.value 是 string[]
-  pickedIds.value = e.detail.value
-  // console.log('pickedIds ->', pickedIds.value)
+  // 可见项（当前过滤结果）
+  const visible = new Set(filteredOptions.value.map(o => String(o.id)))
+  // 可见区的新勾选结果
+  const nextVisibleChecked = new Set((e.detail.value || []).map(String))
+
+  // 先从旧的选择集开始
+  const selected = new Set(pickedIds.value.map(String))
+
+  // 1) 处理可见区的“取消勾选”：可见但没在 nextVisibleChecked 里的，去掉
+  for (const id of visible) {
+    if (!nextVisibleChecked.has(id)) selected.delete(id)
+  }
+  // 2) 处理可见区的“新增勾选”：加上
+  for (const id of nextVisibleChecked) {
+    selected.add(id)
+  }
+
+  pickedIds.value = Array.from(selected) // 仍然是 string[]
 }
 
 function removeRule(idx) {
@@ -339,9 +368,10 @@ function resetRuleForm() {
 
 // 选项数据预加载 & 扁平化
 function preloadOptions() {
-  getAreaCategories().then(res => { areaCats.value = res.data || [] })
+  getAreaCategories().then(res => { areaCats.value = res || [] })
   getDistricts().then(res => {
-    const ds = res.data || []
+    // const ds = res.data || []
+    const ds = res || []
     districts.value = ds
     distFlat.value = ds.map(d => ({ id: d.id, name: d.name_cn }))
     subFlat.value = ds.flatMap(d => (d.subs||[]).map(s => ({ id: s.id, name: s.name_cn, parent: d.name_cn })))
@@ -350,6 +380,45 @@ function preloadOptions() {
 
 // ====== 对外暴露 ======
 defineExpose({ open })
+
+// 展开/收起与清空
+const showPicked = ref(false)
+function toggleShowPicked() { showPicked.value = !showPicked.value }
+function clearPicked() { pickedIds.value = [] }
+function removePicked(id) {
+  pickedIds.value = pickedIds.value.filter(v => String(v) !== String(id))
+}
+
+// 当前模式下的“全部选项”字典 & 总数（不受搜索影响）
+const activeOptionMap = computed(() => {
+  const m = new Map()
+  if (ruleForm.scope.mode === 'area_category') {
+    for (const i of areaCats.value) m.set(String(i.id), i.name)
+  } else if (ruleForm.scope.mode === 'district') {
+    for (const i of distFlat.value) m.set(String(i.id), i.name)
+  } else {
+    for (const i of subFlat.value) {
+      const nm = i.parent ? `${i.parent}·${i.name}` : i.name
+      m.set(String(i.id), nm)
+    }
+  }
+  return m
+})
+
+const totalOptionsCount = computed(() => {
+  if (ruleForm.scope.mode === 'area_category') return areaCats.value.length
+  if (ruleForm.scope.mode === 'district') return distFlat.value.length
+  return subFlat.value.length
+})
+
+// 已选列表（用于展示标签）
+const pickedList = computed(() =>
+  pickedIds.value.map(id => ({
+    id: String(id),
+    name: activeOptionMap.value.get(String(id)) || String(id),
+  }))
+)
+
 </script>
 
 <style scoped>
@@ -385,4 +454,24 @@ defineExpose({ open })
 .opt .parent { color:#999; }
 .picked { margin-top:6rpx; color:#666; }
 .inner-actions { display:flex; justify-content:flex-end; gap:16rpx; margin-top:12rpx; }
+
+.picked-bar {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-top:10rpx; color:#666;
+}
+.picked-actions { display:flex; gap:20rpx; }
+.link { color:#1677ff; }
+.link.danger { color:#ff4d4f; }
+
+.picked-chips {
+  display:flex; flex-wrap:wrap; gap:10rpx; margin-top:8rpx;
+}
+.chip {
+  display:inline-flex; align-items:center; gap:8rpx;
+  padding:6rpx 10rpx; border:1px solid #e5e6eb; border-radius:999px; background:#fafafa;
+}
+.chip-text { max-width: 420rpx; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chip-close { padding:0 4rpx; font-weight:600; }
+
+
 </style>
