@@ -92,13 +92,34 @@
               </picker>
             </uni-forms-item>
 
+            <!-- 条件(选填) —— 替换原来的 3 个 easyinput -->
             <uni-forms-item label="条件(选填)">
               <view class="cond">
-                <uni-easyinput v-model.trim="ruleForm.conditions.volume_range" placeholder="体积范围 例: 0-0.2" />
-                <uni-easyinput v-model.trim="ruleForm.conditions.weight_range" placeholder="重量范围 例: 0-40" />
-                <uni-easyinput v-model.trim="ruleForm.conditions.vehicle" placeholder="车型 例: van/truck" />
+                <!-- 体积范围 -->
+                <view class="range-cell" @click="openRange('volume')">
+                  <text class="range-label">体积范围</text>
+                  <text class="range-value">
+                    {{ displayRange('volume') || '点击设置' }}
+                  </text>
+                </view>
+
+                <!-- 重量范围 -->
+                <view class="range-cell" @click="openRange('weight')">
+                  <text class="range-label">重量范围</text>
+                  <text class="range-value">
+                    {{ displayRange('weight') || '点击设置' }}
+                  </text>
+                </view>
+
+                <!-- 车型下拉 -->
+                <!-- <picker :range="vehicleOptions" range-key="label" @change="onVehicleChange">
+                  <view class="picker">
+                    {{vehicleOptions.find(v => v.value === ruleForm.conditions.vehicle)?.label || '选择车型'}}
+                  </view>
+                </picker> -->
               </view>
             </uni-forms-item>
+
 
             <!-- 区域相关 -->
             <view v-if="ruleForm.type==='area'">
@@ -131,27 +152,51 @@
                 </checkbox-group>
 
                 <!-- 统计条 -->
-<view class="picked-bar">
-  <text>已选：{{ pickedIds.length }} / {{ totalOptionsCount }} 个</text>
-  <view class="picked-actions">
-    <text class="link" @click="toggleShowPicked">{{ showPicked ? '收起' : '查看' }}</text>
-    <text class="link danger" v-if="pickedIds.length" @click="clearPicked">清空</text>
-  </view>
-</view>
+                <view class="picked-bar">
+                  <text>已选：{{ pickedIds.length }} / {{ totalOptionsCount }} 个</text>
+                  <view class="picked-actions">
+                    <text class="link" @click="toggleShowPicked">{{ showPicked ? '收起' : '查看' }}</text>
+                    <text class="link danger" v-if="pickedIds.length" @click="clearPicked">清空</text>
+                  </view>
+                </view>
 
-<!-- 已选项（可展开为标签，支持单个移除） -->
-<view v-if="showPicked && pickedList.length" class="picked-chips">
-  <view class="chip" v-for="item in pickedList" :key="item.id">
-    <text class="chip-text">{{ item.name }}</text>
-    <text class="chip-close" @click="removePicked(item.id)">×</text>
-  </view>
-</view>
+                <!-- 已选项（可展开为标签，支持单个移除） -->
+                <view v-if="showPicked && pickedList.length" class="picked-chips">
+                  <view class="chip" v-for="item in pickedList" :key="item.id">
+                    <text class="chip-text">{{ item.name }}</text>
+                    <text class="chip-close" @click="removePicked(item.id)">×</text>
+                  </view>
+                </view>
 
               </view>
 
 
             </view>
           </uni-forms>
+
+          <!-- 范围设置弹窗 -->
+          <uni-popup ref="rangePop" type="dialog">
+            <view class="range-dlg">
+              <view class="range-dlg-title">
+                设置{{ rangeDlg.type === 'volume' ? '体积' : '重量' }}范围
+              </view>
+
+              <view class="range-row">
+                <text class="range-row-label">开始</text>
+                <uni-easyinput type="number" v-model.trim="rangeDlg.start" placeholder="如 0" />
+              </view>
+              <view class="range-row">
+                <text class="range-row-label">结束</text>
+                <uni-easyinput type="number" v-model.trim="rangeDlg.end" placeholder="如 0.2" />
+              </view>
+
+              <view class="range-dlg-actions">
+                <button @click="rangePop.close()">取消</button>
+                <button type="primary" @click="confirmRange">确定</button>
+              </view>
+            </view>
+          </uni-popup>
+
 
           <view class="inner-actions">
             <button @click="innerPop.close()">取消</button>
@@ -164,7 +209,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, nextTick } from 'vue'
 import { getChannelSurcharges, saveChannelSurcharges, getAreaCategories, getDistricts } from '@/api/channel'
 
 const emit = defineEmits(['saved'])
@@ -242,7 +287,7 @@ function open(id, initialPayload = null) {
       form.surcharges = (res?.surcharges) || []
     })
   }
-  popup.value.open()
+  nextTick(() => popup.value?.open())
 }
 
 // ====== 保存到后端 ======
@@ -259,7 +304,7 @@ function save() {
 function openEditor() {
   editingIdx.value = null
   resetRuleForm()
-  innerPop.value.open()
+  nextTick(() => innerPop.value?.open())
 }
 
 function editRule(idx) {
@@ -269,7 +314,7 @@ function editRule(idx) {
   console.log("scope:", ruleForm.scope?.ids)
   pickedIds.value = (ruleForm.scope?.ids || []).map(String)
 
-  innerPop.value.open()
+  nextTick(() => innerPop.value?.open())
 }
 
 function onPickChange(e) {
@@ -419,6 +464,82 @@ const pickedList = computed(() =>
   }))
 )
 
+
+// —— 范围弹窗状态
+const rangePop = ref(null)
+const rangeDlg = reactive({
+  /** @type {'volume'|'weight'} */ type: 'volume',
+  /** @type {string|number} */ start: '',
+  /** @type {string|number} */ end: ''
+})
+
+// 车型选项（按需调整枚举）
+const vehicleOptions = [
+  { label: '厢式Van', value: 'van' },
+  { label: '小卡车', value: 'truck_small' },
+  { label: '中卡车', value: 'truck_medium' },
+  { label: '大卡车', value: 'truck_large' },
+]
+function onVehicleChange(e) {
+  ruleForm.conditions.vehicle = vehicleOptions[e.detail.value].value
+}
+
+// 打开范围弹窗：kind = 'volume' | 'weight'
+function openRange(kind) {
+  rangeDlg.type = kind
+  const raw = kind === 'volume'
+    ? (ruleForm.conditions.volume_range || '')
+    : (ruleForm.conditions.weight_range || '')
+  const [a, b] = parseRange(raw)
+  rangeDlg.start = a ?? ''
+  rangeDlg.end = b ?? ''
+  nextTick(() => rangePop.value?.open())
+}
+
+// 确认范围：校验「必须是数字」「开始<=结束」
+function confirmRange() {
+  const s = String(rangeDlg.start).trim()
+  const e = String(rangeDlg.end).trim()
+  if (s === '' || e === '') {
+    uni.showToast({ title: '请填写开始与结束', icon: 'none' })
+    return
+  }
+  const start = Number(s)
+  const end = Number(e)
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    uni.showToast({ title: '必须是数字', icon: 'none' })
+    return
+  }
+  if (start > end) {
+    uni.showToast({ title: '开始不能大于结束', icon: 'none' })
+    return
+  }
+  const value = `${stripZeros(start)}-${stripZeros(end)}`
+  if (rangeDlg.type === 'volume') {
+    ruleForm.conditions.volume_range = value
+  } else {
+    ruleForm.conditions.weight_range = value
+  }
+  rangePop.value.close()
+}
+
+// 工具：解析/展示/格式化
+function parseRange(str) {
+  if (!str) return [null, null]
+  const parts = String(str).split('-').map(v => v.trim())
+  if (parts.length !== 2) return [null, null]
+  const a = Number(parts[0]); const b = Number(parts[1])
+  return [Number.isNaN(a) ? null : a, Number.isNaN(b) ? null : b]
+}
+function displayRange(kind) {
+  return kind === 'volume' ? ruleForm.conditions.volume_range : ruleForm.conditions.weight_range
+}
+function stripZeros(n) {
+  return String(n).replace(/\.0+$/,'').replace(/(\.\d*[1-9])0+$/,'$1')
+}
+
+
+
 </script>
 
 <style scoped>
@@ -444,7 +565,7 @@ const pickedList = computed(() =>
 .inner { width: 90%; height: 90%;  background:#fff; border-radius:16rpx; padding:20rpx; overflow: auto;}
 .inner-title { font-size:28rpx; font-weight:600; margin-bottom:10rpx; text-align:center; }
 .picker { padding: 8rpx 12rpx; color:#666; min-height: 60rpx; display:flex; align-items:center; border:1px solid #eee; border-radius:8rpx; }
-.cond { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8rpx; }
+.cond { display:grid; grid-template-columns: 1fr 1fr; gap: 8rpx; }
 .chooser { margin-top:8rpx; }
 .chooser-head { display:flex; }
 .search { border:1px solid #ddd; border-radius:8rpx; padding:10rpx 12rpx; width:100%; }
@@ -472,6 +593,24 @@ const pickedList = computed(() =>
 }
 .chip-text { max-width: 420rpx; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .chip-close { padding:0 4rpx; font-weight:600; }
+
+
+/* 条件区域里每个块的外观 */
+.range-cell{
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 10rpx 12rpx; border:1px solid #eee; border-radius:8rpx;
+  min-height: 60rpx; background:#fff; cursor:pointer;
+}
+.range-cell + .range-cell{ margin-left: 8rpx; }
+.range-label{ color:#666; }
+.range-value{ color:#333; }
+
+/* 弹窗 */
+.range-dlg{ width: 560rpx; background:#fff; border-radius:12rpx; padding:20rpx; }
+.range-dlg-title{ text-align:center; font-weight:600; margin-bottom:12rpx; }
+.range-row{ display:flex; align-items:center; gap:12rpx; margin:10rpx 0; }
+.range-row-label{ width:100rpx; color:#666; text-align:right; }
+.range-dlg-actions{ display:flex; justify-content:flex-end; gap:16rpx; margin-top:10rpx; }
 
 
 </style>

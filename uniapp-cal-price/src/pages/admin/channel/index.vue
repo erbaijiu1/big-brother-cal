@@ -95,7 +95,7 @@
 
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import SurchargeEditor from '@/components/SurchargeEditor.vue'
 import SurchargeSummary from '@/components/SurchargeSummary.vue'
 import { onPullDownRefresh } from '@dcloudio/uni-app'
@@ -219,10 +219,14 @@ onPullDownRefresh(() => { fetchData(); uni.stopPullDownRefresh() })
 function onIncludeDeletedChange(e) { query.include_deleted = !!e.detail.value; fetchData() }
 
 const surchargeRef = ref(null)
-function openSurcharge(row) {
-  if (!row?.id) return uni.showToast({ title: '请先保存渠道', icon: 'none' })
+async function openSurcharge(row) {
+  if (!row?.id) {
+    uni.showToast({ title: '请先保存渠道', icon: 'none' })
+    return
+  }
   const payload = row.surcharge_rules?.surcharges ? row.surcharge_rules : null
-  surchargeRef.value.open(row.id, payload)
+  await nextTick()                    // 等子组件和其内部 uni-popup 完成挂载
+  surchargeRef.value?.open(row.id, payload)
 }
 
 async function preloadNameMaps() {
