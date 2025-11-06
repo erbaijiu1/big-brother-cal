@@ -20,7 +20,7 @@ export const saveChannelSurcharges = (id, payload) => {
 // 获取区域分类
 export const getAreaCategories = () => {
   return request({
-    url: '/cal_price/area_categories',
+    url: '/cal_price/area_categories/',
     method: 'GET'
   })
 }
