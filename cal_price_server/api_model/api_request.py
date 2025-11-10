@@ -36,3 +36,13 @@ class PricingRuleUpdate(PricingRuleBase):
 class LoginForm(BaseModel):
     username: str
     password: str
+
+
+# ======== 模型 ========
+class MenuItem(BaseModel):
+    title: str
+    desc: str
+    path: str
+    order: Optional[int] = 9999
+    permission_less: Optional[int] = 0
+

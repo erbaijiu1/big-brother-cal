@@ -1,13 +1,15 @@
 import json
 from typing import Optional, Dict, Any, List, Tuple
 
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 import config
 from db.area_category_db_handle import get_sub_district_names_by_category_ids
 from db.channel_db_handle import get_channel_config_by_channel
 from db.db_models import PricingRule
-from db.district_db_handle import get_district_list, get_districts_by_ids
+from db.district_db_handle import get_districts_by_ids
+from db.pricing_rule_db_handle import get_pricing_rule_by_category_id
 from db.sub_district_db_handle import get_sub_district_names_by_ids
 from utils.logger_config import logger
 
@@ -132,7 +134,7 @@ def calculate_surcharge_with_breakdown(
     return breakdown
 
 
-def get_type_max_fee(price_rules: str, volume: float, weight: float, details: List[FeeDetail], name: str, cn_name: str) -> float:
+def get_type_max_fee(price_rules: str, volume: float, weight: float, details: List[FeeDetail], name: str, cn_name: str, extra_fee_data: Dict[str, Any]) -> float:
     if not price_rules or len(price_rules)<=0 :
         return 0.0
 
@@ -150,9 +152,10 @@ def get_type_max_fee(price_rules: str, volume: float, weight: float, details: Li
     target_rule, target_unit = (w_unit_rule, weight) if kg_price >= cbm_price else (v_unit_rule, volume)
 
     # 增加我们要挣的钱
-    if name in config.EXTRA_FEE_ITEMS:
+    if name in config.EXTRA_FEE_ITEMS and not extra_fee_data.get('is_inner', False):
         earn_money = max(config.MIN_EARN_MONEY, unit_price * config.EARN_MONEY_RATIO)
         unit_price = unit_price + earn_money
+        logger.debug(f"earn_money: {earn_money}, unit_price: {unit_price}")
 
     # logger.info(f"unit_price: {unit_price}, earn_money: {earn_money}")
     if target_rule is not None:
@@ -178,10 +181,10 @@ def calculate_total_price(
     details: List[FeeDetail] = []
     try:
         # 1. 运输费用
-        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, details, 'unit_price', '运输费用')
+        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, details, 'unit_price', '运输费用', extra_fee_data)
 
         # 2. 派送费
-        delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, details, 'delivery_fee', '派送费')
+        delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, details, 'delivery_fee', '派送费', extra_fee_data)
 
         # 3. 附加费（新结构）
         channel_cfg = get_channel_config_by_channel(rule.channel)
@@ -211,7 +214,7 @@ def check_filter_rule_imp(filter_rules:str, context, weight: float, volume: floa
     filter_config = json.loads(filter_rules) if isinstance(filter_rules, str) else (filter_rules or {})
     # 没有过滤条件，直接返回 True 或 False，看你的业务需求
     if not filter_config or not isinstance(filter_config, dict):
-        logger.error("Invalid filter_rules: %s", filter_rules)
+        # logger.error("Invalid filter_rules: %s", filter_rules)
         return False
 
     for key, value in filter_config.items():
@@ -277,7 +280,6 @@ def calculate_surcharge_with_breakdown_new(
 
     cur_district     = context.get("district")
     cur_sub_district = context.get("sub_district")
-    cur_area_cats    = set(context.get("area_category_ids", []) or [])
 
     # 命中按 key 分桶，最后按 combine 聚合
     hit_by_key: dict[str, list[FeeDetail]] = {}
@@ -287,7 +289,6 @@ def calculate_surcharge_with_breakdown_new(
         title   = rule.get("title") or key
         rtype   = (rule.get("type") or "area").lower()
         price   = float(rule.get("price", 0))
-        combine = (rule.get("combine") or "sum").lower()
 
         # 1) 条件
         cond = rule.get("conditions") or {}
@@ -308,7 +309,6 @@ def calculate_surcharge_with_breakdown_new(
         # 2) 作用域
         scope = rule.get("scope") or {}
         mode = scope.get("mode")
-        names = []
         ids = scope.get("ids", [])
 
         match_scope = True
@@ -329,7 +329,8 @@ def calculate_surcharge_with_breakdown_new(
                 try:
                     names = get_sub_district_names_by_category_ids(ids)
                     match_scope = cur_sub_district in names
-                except Exception:
+                except Exception as e:
+                    logger.exception(f"Error in calculate_surcharge_with_breakdown_new: {e}")
                     # names 不是数字，也可直接和 extra 传进来的别名列表做交集
                     match_scope = False
             else:
@@ -363,3 +364,45 @@ def calculate_surcharge_with_breakdown_new(
 
     return breakdown
 
+
+async def get_pricing_for_web_comm(data):
+    category_id = data.category_id
+    weight = data.weight
+    volume = data.volume
+    extra_fee_data = data.extra_fee_data
+
+    try:
+        rules = get_pricing_rule_by_category_id(category_id)
+        quote_list = []
+
+        for rule in rules:
+            try:
+                if check_if_channel_rule_filter(rule, extra_fee_data, weight, volume):
+                    logger.info(f"Skipping rule, channel: {rule.channel}, rule id:{rule.id}")
+                    continue
+
+                total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, extra_fee_data)
+                if total_price <= 0:
+                    continue
+                if total_price < rule.min_consumption:
+                    total_price = rule.min_consumption
+
+                quote_list.append({
+                    "channel": rule.channel,
+                    "transport_method": rule.transport_method,
+                    "warehouse": rule.warehouse,
+                    "total_price": round(total_price, 2),
+                    "rule_id": rule.id
+                    , "remark": channel_conf.remark if channel_conf else ""
+                    , "fee_details": fee_details
+                })
+                logger.info(f"Quote for channel {rule.channel} is {total_price}, fees:{fee_details}")
+            except Exception as e:
+                logger.error(f"Failed to calculate quote for channel {rule.channel}, rule_id:{rule.id}: {e}", exc_info=True)
+
+        sorted_quotes = sorted(quote_list, key=lambda x: x['total_price'])
+        return {"code": 200, "message": "success", "data": sorted_quotes}
+
+    except Exception as e:
+        logger.error(f"Failed to fetch quote list: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

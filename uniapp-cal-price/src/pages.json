@@ -17,7 +17,13 @@
       "style": {
         "navigationBarTitleText": "管理后台"
       }
-    }
+    },
+	{
+		"path": "pages/admin/pricing_cal/index",
+		"style": {
+			"navigationBarTitleText": "渠道成本计算"
+		}
+	}
   ],
 	"subPackages": [
 	  {

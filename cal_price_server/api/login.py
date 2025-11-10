@@ -20,3 +20,11 @@ def jwt_auth(request: Request):
 
     return payload
 
+
+def get_user_priority(payload: dict) -> int:
+    """
+    简单的优先级映射：big_admin=100，其它=1
+    （后续可替换为 DB/角色-权限体系）
+    """
+    return 100 if payload.get("sub") == "big_admin" else 1
+
