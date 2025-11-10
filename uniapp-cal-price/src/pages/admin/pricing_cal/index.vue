@@ -1,0 +1,438 @@
+<template>
+  <view class="container">
+    <!-- 分类 -->
+    <view class="form-item">
+      <text class="label">分类</text>
+      <picker :range="categories" range-key="main" @change="onCategoryChange">
+        <view class="picker-box">
+          <text class="main-category">{{ selectedCategoryMain || '请选择分类' }}</text>
+        </view>
+      </picker>
+      <view v-if="selectedCategorySub" class="sub-category-desc">举例：{{ selectedCategorySub }}</view>
+    </view>
+
+    <!-- 重量 -->
+    <view class="form-item">
+      <text class="label">重量（kg）</text>
+      <input type="number" v-model.number="weight" placeholder="请输入实重" class="input" />
+      <view class="field-tip">称重所得的真实重量</view>
+    </view>
+
+    <!-- 体积 -->
+    <view class="form-item">
+      <text class="label">体积（m³）</text>
+      <input type="number" v-model.number="volume" placeholder="体积选填：如0.02" class="input" />
+      <view class="field-tip">体积重公式：体积 × 200 ≈ kg</view>
+    </view>
+
+    <!-- 计费重量提示 -->
+    <view v-if="chargeWeightTip" class="charge-weight-tip">{{ chargeWeightTip }}</view>
+
+    <!-- 地址（分区/小区） -->
+    <view class="form-item address-row">
+      <text class="label">收貨地區</text>
+      <view class="address-select-wrap">
+        <picker :range="districts" range-key="district_cn" @change="onDistrictChange">
+          <view class="select-box">{{ selectedDistrictName || '請選擇行政區' }}</view>
+        </picker>
+        <picker :range="subDistricts" range-key="sub_cn" @change="onSubDistrictChange" :disabled="!selectedDistrict">
+          <view class="select-box">{{ selectedSubDistrictName || '請選擇分區／地段' }}</view>
+        </picker>
+      </view>
+      <view v-if="isRemote !== null" class="remote-tip" :class="{ remote: isRemote }"></view>
+    </view>
+
+    <!-- 是否需要上楼 -->
+    <view class="form-item">
+      <text class="label">是否需要上楼</text>
+      <radio-group class="radio-group" :value="needGoUpstairs" @change="onNeedGoUpstairsChange">
+        <label class="radio-label">
+          <radio value="1" :checked="needGoUpstairs === '1'" class="mini-radio" /> 是
+        </label>
+        <label class="radio-label">
+          <radio value="0" :checked="needGoUpstairs === '0'" class="mini-radio" /> 否
+        </label>
+      </radio-group>
+    </view>
+
+    <!-- 仅当上楼显示 -->
+    <view v-if="needGoUpstairs === '1'">
+      <view class="form-item">
+        <text class="label">是否电梯</text>
+        <radio-group class="radio-group" :value="hasElevator" @change="e => hasElevator = e.detail.value">
+          <label class="radio-label">
+            <radio value="1" :checked="hasElevator === '1'" class="mini-radio" /> 有
+          </label>
+          <label class="radio-label">
+            <radio value="0" :checked="hasElevator === '0'" class="mini-radio" /> 无
+          </label>
+        </radio-group>
+      </view>
+      <view class="form-item">
+        <text class="label">是否搬阶梯</text>
+        <radio-group class="radio-group" :value="needStairs" @change="e => needStairs = e.detail.value">
+          <label class="radio-label">
+            <radio value="1" :checked="needStairs === '1'" class="mini-radio" /> 是
+          </label>
+          <label class="radio-label">
+            <radio value="0" :checked="needStairs === '0'" class="mini-radio" /> 否
+          </label>
+        </radio-group>
+      </view>
+    </view>
+
+    <!-- 报价按钮 -->
+    <button class="submit-button" @click="submit">我要查价</button>
+
+    <!-- 报价结果弹窗 -->
+    <uni-popup ref="resultPopup" type="dialog" class="result-popup"
+      custom-style="width:80%;max-width:700rpx;border-radius:20rpx;">
+      <view class="popup">
+        <text class="popup-title">报价结果</text>
+
+        <view v-if="resultList.length === 0" class="quote-empty">
+          当前报价方案未匹配，找客服领解决方案
+        </view>
+
+        <view v-else>
+          <view v-for="(item, index) in resultList" :key="index" class="quote-card">
+            <view class="quote-head">
+              <view>
+                <text class="plan">方案{{ index + 1 }}</text>
+                <text class="channel-label">{{ item.channel }}</text>
+                <text class="channel-label">{{ item.transport_method }}</text>
+              </view>
+              <text class="price">{{ item.total_price }} 元</text>
+            </view>
+
+            <view class="fee-details">
+              <view v-for="fee in item.fee_details" :key="fee.name" class="fee-item">
+                {{ fee.cn_name }}：{{ fee.amount }}
+              </view>
+            </view>
+
+            <view v-if="item.remark" class="quote-remark">
+              备注：{{ item.remark }}
+            </view>
+          </view>
+        </view>
+
+        <view v-if="needGoUpstairs === '1'" class="extra-fee-tip">
+          上楼费请咨询行政
+        </view>
+      </view>
+    </uni-popup>
+
+    <WechatFab ref="fab" />
+  </view>
+</template>
+
+<script>
+import hkDistricts from '@/common/hk_districts.json'
+import uniPopup from '@dcloudio/uni-ui/lib/uni-popup/uni-popup.vue'
+import WechatFab from '@/components/WechatFab.vue'
+import { request } from '@/common/utils/request'   // ✅ 统一封装的请求（401 自动跳登录）
+
+export default {
+  components: { uniPopup, WechatFab },
+  data () {
+    return {
+      /********* 表单 *********/
+      categories: [],
+      selectedCategory: null,
+      selectedCategoryMain: '',
+      selectedCategorySub: '',
+
+      weight: null,
+      volume: null,
+
+      districts: hkDistricts,
+      subDistricts: [],
+      selectedDistrict: null,
+      selectedDistrictName: '',
+      selectedSubDistrict: null,
+      selectedSubDistrictName: '',
+      isRemote: null,
+
+      needGoUpstairs: '0',
+      hasElevator: '0',
+      needStairs: '0',
+
+      /********* 结果 *********/
+      resultList: []
+    }
+  },
+
+  computed: {
+    volumetricWeight () {
+      if (!this.volume && this.volume !== 0) return null
+      const v = parseFloat(this.volume)
+      return isNaN(v) ? null : +(v * 200).toFixed(2)
+    },
+    chargeWeight () {
+      if (this.volumetricWeight === null || this.weight === null) return null
+      const w = parseFloat(this.weight)
+      if (isNaN(w)) return null
+      return Math.max(w, this.volumetricWeight).toFixed(2)
+    },
+    chargeWeightTip () {
+      if (this.chargeWeight === null) return ''
+      return `计费重量：${this.chargeWeight} kg（体积重 ${this.volumetricWeight} kg / 实重 ${this.weight} kg，取其大）`
+    }
+  },
+
+  watch: {
+    weight (val) { if (val === '') this.weight = null },
+    volume (val) { if (val === '') this.volume = null }
+  },
+
+  onLoad () {
+    this.loadCategories()
+  },
+
+  methods: {
+    /**************** 数据加载（改用 request） ****************/
+    async loadCategories () {
+      try {
+        const res = await request({ url: '/cal_price/classify/classify_list', method: 'POST', data: {} })
+        if (res.code === 200) {
+          this.categories = (res.data || []).map(item => ({
+            id: item.category_id,
+            main: item.main_category,
+            sub: item.sub_examples
+          }))
+        } else {
+          uni.showToast({ title: res.msg || '分类加载失败', icon: 'none' })
+        }
+      } catch (e) {
+        uni.showToast({ title: '网络错误，稍后再试', icon: 'none' })
+      }
+    },
+
+    /**************** 交互 ****************/
+    onCategoryChange (e) {
+      const index = e.detail.value
+      const selected = this.categories[index]
+      this.selectedCategory = selected.id
+      this.selectedCategoryMain = selected.main
+      this.selectedCategorySub = selected.sub
+    },
+
+    onDistrictChange (e) {
+      const idx = e.detail.value
+      const district = this.districts[idx]
+      this.selectedDistrict = district.district_cn
+      this.selectedDistrictName = district.district_cn
+      this.subDistricts = district.sub_districts
+      this.selectedSubDistrict = null
+      this.selectedSubDistrictName = ''
+      this.isRemote = null
+    },
+
+    onSubDistrictChange (e) {
+      const idx = e.detail.value
+      const sub = this.subDistricts[idx]
+      this.selectedSubDistrict = sub.sub_cn
+      this.selectedSubDistrictName = sub.sub_cn
+      this.isRemote = sub.remote
+    },
+
+    onNeedGoUpstairsChange (e) {
+      this.needGoUpstairs = (e.detail && e.detail.value)
+        ? e.detail.value
+        : e.target.value
+      if (this.needGoUpstairs === '0') {
+        this.hasElevator = '0'
+        this.needStairs = '0'
+      }
+    },
+
+    /**************** 提交（改用 request） ****************/
+    async submit () {
+      if (!this.selectedCategory) {
+        uni.showToast({ title: '请选择分类', icon: 'none' }); return
+      }
+      if (this.weight === null && this.volume === null) {
+        uni.showToast({ title: '请填写重量或体积', icon: 'none' }); return
+      }
+
+      const extra = {
+        type: '袋装',
+        need_go_upstairs: this.needGoUpstairs,
+        district: this.selectedDistrict,
+        sub_district: this.selectedSubDistrict,
+        is_remote: this.isRemote,
+        has_elevator: this.hasElevator,
+        need_stairs: this.needStairs
+      }
+
+      try {
+        const res = await request({
+          url: '/cal_price/inner_query/min_pricing',
+          method: 'POST',
+          data: {
+            category_id: Number(this.selectedCategory),
+            weight: this.weight === null ? 0 : Number(this.weight),
+            volume: this.volume === null ? 0 : Number(this.volume),
+            extra_fee_data: extra
+          }
+        })
+        this.resultList = (res && res.data) ? res.data : []
+        this.$refs.resultPopup.open()
+      } catch (e) {
+        uni.showToast({ title: '请求失败，请稍后再试', icon: 'none' })
+      }
+    },
+
+    /**************** 结果处理 ****************/
+    calcChargeWeight (item) {
+      if (item.charge_weight) return item.charge_weight
+      const unitLine = item.fee_details?.find(f => f.name === 'unit_price')
+      return unitLine ? unitLine.applied_value : '--'
+    }
+  }
+}
+</script>
+
+<style scoped>
+/* =============== 通用容器 =============== */
+.container {
+  padding: 20rpx;
+  background-color: #f4f6f9;
+  font-size: 28rpx;
+  min-height: 100vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+/* =============== 表单标签与行 =============== */
+.label          { font-weight: bold; color: #333; margin-bottom: 12rpx; display: block; }
+.form-item      { margin-bottom: 40rpx; }
+
+.input, .picker-box {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 12rpx;
+  padding: 0rpx 20rpx;
+  font-size: 28rpx;
+  min-height: 64rpx;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  line-height: 64rpx;
+}
+.picker-box .main-category { font-weight: bold; color: #333; }
+
+.field-tip        { font-size: 24rpx; color: #999; margin-top: 6rpx; }
+.charge-weight-tip{ font-size: 26rpx; color: #007aff; margin: -24rpx 0 24rpx 0; font-weight: 500; }
+
+.sub-category-desc{
+  color: #999; font-size: 24rpx; margin: 8rpx 0 0 6rpx;
+}
+
+.address-select-wrap{
+  display: flex; flex-direction: row; gap: 18rpx; margin-top: 8rpx;
+}
+.select-box{
+  flex: 1 1 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  min-height: 56rpx;
+  font-size: 28rpx;
+  display: flex; align-items: center;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+
+.remote-tip         { margin-top: 6rpx; font-size: 24rpx; color: #999; }
+.remote-tip.remote  { color: #ff9800; font-weight: bold; }
+
+.radio-group{
+  display: flex !important; flex-direction: row !important;
+  gap: 40rpx; margin-top: 20rpx;
+}
+.radio-label{
+  display: flex; align-items: center; font-size: 28rpx; color: #333; margin-right: 24rpx;
+}
+.mini-radio >>> .uni-radio-input,
+.mini-radio >>> .uni-radio-input-checked,
+.mini-radio /deep/ .uni-radio-input,
+.mini-radio /deep/ .uni-radio-input-checked{
+  transform: scale(0.75); margin-right: 10rpx;
+}
+
+.submit-button{
+  background: #007aff; color: #fff; padding: 2rpx;
+  border-radius: 14rpx; font-size: 32rpx; text-align: center;
+  margin-top: 20rpx; width: 100%; box-sizing: border-box;
+}
+
+.popup{
+  padding: 5px; background: #fff; border-radius: 20rpx;
+  max-height: 80vh; overflow-y: auto; box-sizing: border-box; margin: 5px;
+}
+.popup-title{
+  font-size: 32rpx; font-weight: bold; text-align: center;
+  margin-bottom: 20rpx; color: #222;
+}
+
+.quote-card{
+  border: 1px solid #e5e5e5; border-radius: 16rpx;
+  padding: 24rpx; margin-bottom: 24rpx;
+}
+.quote-head{
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12rpx;
+}
+.quote-head .plan  { font-size: 30rpx; font-weight: 600; color: #333; }
+.quote-head .price { font-size: 32rpx; font-weight: 700; color: #e64340; }
+.quote-base{
+  display: flex; flex-wrap: wrap; gap: 24rpx;
+  font-size: 26rpx; color: #555; margin-bottom: 12rpx;
+}
+.fee-details{
+  display: flex; flex-wrap: wrap; gap: 16rpx;
+  font-size: 26rpx; color: #888; margin-bottom: 10rpx;
+}
+.fee-item           { white-space: nowrap; }
+.charge-weight-row  { font-size: 26rpx; color: #666; margin-bottom: 10rpx; }
+
+.channel-label{
+  font-size: 26rpx; color: #888; margin-left: 10rpx; 
+}
+
+.quote-remark {
+  margin-top: 6rpx;
+  color: #888;
+  font-size: 22rpx;
+  background: #f6f6f6;
+  border-radius: 8rpx;
+  padding: 10rpx 14rpx;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+html, body { overflow: auto !important; }
+.uni-popup    { position: relative; }
+
+.quote-empty {
+  text-align: center;
+  font-size: 26rpx;
+  color: #888;
+  padding: 40rpx 20rpx;
+}
+
+.quote-bottom {
+  margin-top: 32rpx;
+  text-align: center;
+}
+.wechat-btn {
+  background-color: #07C160;
+  color: #fff;
+  font-size: 28rpx;
+  padding: 18rpx 40rpx;
+  border-radius: 12rpx;
+  border: none;
+}
+</style>
