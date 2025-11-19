@@ -150,21 +150,20 @@ function isBlankRow(r) {
          (!r.range || r.range === '')
 }
 
-/* ✅ 修改：仅校验“非空白行”。该单位若没有任何非空白行 → 允许（CBM 可为空） */
 function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
+  // 仅校验“非空白行”，允许该单位完全为空（CBM 可为空）
   const rows = (group.rows || []).filter(r => !isBlankRow(r))
   const issues = []
-
-  // 该单位完全没填 —— 允许
   if (rows.length === 0) return issues
 
+  // 解析区间 + 基本校验
   let ranges = rows.map((r, i) => {
     const pr = (r._min !== undefined || r._max !== undefined)
       ? parseRangeFields(r._min, r._max)
       : parseRangeString(r.range)
 
     if (!pr) {
-      issues.push(`${unitLabel} 第 ${i + 1} 行区间格式错误（示例：0-40；上限空=∞）`)
+      issues.push(`${unitLabel} 第 ${i + 1} 行区间格式错误（示例：30-50；上限空=∞）`)
       return null
     }
 
@@ -175,8 +174,9 @@ function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
     }
     if (min >= max) issues.push(`${unitLabel} 第 ${i + 1} 行区间应满足 min < max`)
 
-    const hasUnitPrice = !isEmpty(r.unit_price) && !isNaN(Number(r.unit_price))
-    const hasPrize     = !isEmpty(r._prize)     && !isNaN(Number(r._prize))
+    // 至少有“单价”或“一口价”之一
+    const hasUnitPrice = r.unit_price !== '' && !isNaN(Number(r.unit_price))
+    const hasPrize     = r._prize     !== '' && !isNaN(Number(r._prize))
     if (!hasUnitPrice && !hasPrize) {
       issues.push(`${unitLabel} 第 ${i + 1} 行需填写 单价 或 一口价`)
     }
@@ -186,24 +186,19 @@ function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
 
   if (issues.length) return issues
 
+  // 仅检查“中间的”：相邻区间不得重叠、不得断档
   ranges = ranges.filter(Boolean).sort((a, b) => a.min - b.min)
-  if (ranges.length === 0) return issues
-
-  if (ranges[0].min !== 0) {
-    issues.push(`${unitLabel} 区间应从 0 开始（当前最小为 ${ranges[0].min}）`)
-  }
   for (let i = 1; i < ranges.length; i++) {
     const p = ranges[i - 1]
     const c = ranges[i]
     if (c.min < p.max) issues.push(`${unitLabel} 第 ${p.i + 1} 与第 ${c.i + 1} 行区间重叠（${p.min}-${p.max} 与 ${c.min}-${c.max}）`)
     if (c.min > p.max) issues.push(`${unitLabel} 在 ${p.max} 与 ${c.min} 之间存在缺口`)
   }
-  const lastMax = ranges[ranges.length - 1].max
-  if (lastMax !== Number(DEFAULT_MAX)) {
-    issues.push(`${unitLabel} 末尾未覆盖到 ${DEFAULT_MAX}（当前截止到 ${lastMax}）`)
-  }
+
+  // 不再要求从 0 开始，也不再要求到 ∞ 结束
   return issues
 }
+
 
 /* ---------- state ---------- */
 const state = reactive({
