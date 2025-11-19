@@ -188,7 +188,11 @@ const channelIndex = computed(() => {
   return Math.max(0, i)
 })
 const channelDisplay = computed(() => channelOptions.value[channelIndex.value]?.display || '全部')
-function onChannelChange(e) { query.channel = channelOptions.value[e.detail.value]?.channel_code || '' }
+function onChannelChange(e) {
+  query.channel = channelOptions.value[e.detail.value]?.channel_code || '';
+  query.page = 1;               // 切换筛选重置到第 1 页
+  fetchData();
+}
 
 /** ==== 分类选择 ==== */
 const categoryOptions = computed(() => [
@@ -200,7 +204,11 @@ const categoryIndex = computed(() => {
   return Math.max(0, i)
 })
 const categoryDisplay = computed(() => categoryOptions.value[categoryIndex.value]?.main_category || '全部')
-function onCategoryChange(e) { query.category_id = categoryOptions.value[e.detail.value]?.category_id || 0 }
+function onCategoryChange(e) {
+  query.category_id = categoryOptions.value[e.detail.value]?.category_id || 0; 
+  query.page = 1;               // 切换筛选重置到第 1 页
+  fetchData();
+}
 
 /** 其他交互 */
 function onIncludeDeletedChange(e) { query.include_deleted = !!e.detail.value; fetchData() }
