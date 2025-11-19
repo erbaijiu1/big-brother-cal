@@ -220,7 +220,8 @@ def check_filter_rule_imp(filter_rules:str, context, weight: float, volume: floa
     for key, value in filter_config.items():
         # 处理“区在列表里”
         if key == "sub_districts_in":
-            if context.get('sub_district') not in value:
+            sub_district = context.get('sub_district', '')
+            if sub_district and sub_district not in value:
                 return False
 
         # 处理“重量区间”

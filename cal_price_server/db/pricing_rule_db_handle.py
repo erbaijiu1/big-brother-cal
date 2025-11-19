@@ -19,7 +19,10 @@ def get_pricing_rule_by_category_id(category_id)-> List[PricingRule]:
     Session = get_session_factory()
     try:
         with Session() as session:
-            result = session.query(PricingRule).filter(PricingRule.category_id == category_id).all()
+            result = session.query(PricingRule).filter(
+                PricingRule.category_id == category_id).filter(
+                PricingRule.status == 1
+            ).all()
             return result
     except Exception as e:
         logger.error(f"Error occurred while querying user conversation summary: {e}")
