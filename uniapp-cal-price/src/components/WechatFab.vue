@@ -32,7 +32,7 @@ export default {
     },
 
     openCorpWx() {
-      const link = 'https://work.weixin.qq.com/ca/cawcdeae7f79de5a3d'
+      const link = 'https://work.weixin.qq.com/ca/cawcde96436f7eeacb'
 
       /* #ifdef APP-PLUS */
       plus.runtime.openURL(link)
