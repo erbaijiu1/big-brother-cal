@@ -39,8 +39,7 @@
         </view>
         <view v-if="popupMode === 'sub'" class="form-item remote-box">
           <text>是否偏远区</text>
-          <switch v-model="form.is_remote" />
-        </view>
+          <switch :checked="form.is_remote" @change="e => form.is_remote = e.detail.value" />        </view>
         <view class="actions">
           <button size="mini" @click="popup.close">取消</button>
           <button size="mini" type="primary" @click="save">保存</button>

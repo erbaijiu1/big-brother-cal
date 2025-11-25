@@ -6,13 +6,18 @@
     </view>
     <uni-popup ref="qrPopup" type="center">
       <view class="qr-wrap">
-        <image src="@/static/qywx_qr_code.png" mode="widthFix" class="qr-img" />
+        <!-- 关键：增加 show-menu-by-longpress -->
+        <image
+          src="@/static/qywx_qr_code.png"
+          mode="widthFix"
+          class="qr-img"
+          show-menu-by-longpress="true"
+        />
         <text class="qr-tip">长按识别，添加企业微信客服</text>
       </view>
     </uni-popup>
   </view>
 </template>
-
 
 <script>
 import uniPopup from '@dcloudio/uni-ui/lib/uni-popup/uni-popup.vue'
@@ -23,37 +28,16 @@ export default {
     uniPopup
   },
   methods: {
-    /**
- * 给外部调用用的：弹出二维码弹窗
- */
-    showPopup() {
+    // 给外部调用用的：弹出二维码弹窗
+    showPopup () {
       console.log('[WechatFab] showPopup 被调用')
       this.$refs.qrPopup?.open?.()
     },
 
-    openCorpWx() {
-      const link = 'https://work.weixin.qq.com/ca/cawcde96436f7eeacb'
-
-      /* #ifdef APP-PLUS */
-      plus.runtime.openURL(link)
-      /* #endif */
-
-      /* #ifdef H5 */
-      if (/micromessenger/i.test(navigator.userAgent)) {
-        window.location.href = link
-      } else {
-        this.showPopup()
-      }
-      /* #endif */
-
-      /* #ifdef MP-WEIXIN */
-      wx.openEmbeddedMiniProgram({
-        appId: 'wx3c11569eb1c89a87',
-        path: link
-      })
-      /* #endif */
+    // 浮窗点击：只弹出二维码
+    openCorpWx () {
+      this.showPopup()
     }
-
   }
 }
 </script>
@@ -104,5 +88,4 @@ export default {
   color: #000;
   margin-top: 16rpx;
 }
-
 </style>

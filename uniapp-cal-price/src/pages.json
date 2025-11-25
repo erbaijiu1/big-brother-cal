@@ -1,5 +1,5 @@
 {
-	"pages": [
+  "pages": [
     {
       "path": "pages/index/index",
       "style": {
@@ -11,58 +11,57 @@
       "style": {
         "navigationBarTitleText": "登录页"
       }
-    },
-    {
-      "path": "pages/admin/index",
-      "style": {
-        "navigationBarTitleText": "管理后台"
-      }
-    },
-	{
-		"path": "pages/admin/pricing_cal/index",
-		"style": {
-			"navigationBarTitleText": "渠道成本计算"
-		}
-	}
+    }
   ],
-	"subPackages": [
-	  {
-		"root": "pages/admin",
-		"pages": [
-		  {
-			"path": "channel/index",
-			"style": { "navigationBarTitleText": "渠道管理" }
-		  },
-		  {
-			"path": "classify_mgr/index",
-			"style": { "navigationBarTitleText": "分类管理" }
-		  },
-		  {
-			"path": "pricing_mgr/index",
-			"style": { "navigationBarTitleText": "计费管理" }
-		  },
-		  {
-			"path": "district/index",
-			"style": { "navigationBarTitleText": "地区管理" }
-		  },
-		  {
-			"path": "user_mgr/index",
-			"style": { "navigationBarTitleText": "用户管理" }
-		  }
-		]
-	  }
-	],
-	"window": {
-	  "navigationBarTextStyle": "black",
-	  "navigationBarTitleText": "uni-app",
-	  "navigationBarBackgroundColor": "#F8F8F8",
-	  "backgroundColor": "#F8F8F8"
-	},
-	"easycom": {
-	  "autoscan": true,
-	  "custom": {
-		"^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
-	  }
-	}
+  "subPackages": [
+    {
+      "root": "pages/admin",
+      "pages": [
+        {
+          "path": "index",  
+          "style": {
+            "navigationBarTitleText": "管理后台"
+          }
+        },
+        {
+          "path": "pricing_cal/index",  // 对应 pages/admin/pricing_cal/index
+          "style": {
+            "navigationBarTitleText": "渠道成本计算"
+          }
+        },
+        {
+          "path": "channel/index",
+          "style": { "navigationBarTitleText": "渠道管理" }
+        },
+        {
+          "path": "classify_mgr/index",
+          "style": { "navigationBarTitleText": "分类管理" }
+        },
+        {
+          "path": "pricing_mgr/index",
+          "style": { "navigationBarTitleText": "计费管理" }
+        },
+        {
+          "path": "district/index",
+          "style": { "navigationBarTitleText": "地区管理" }
+        },
+        {
+          "path": "user_mgr/index",
+          "style": { "navigationBarTitleText": "用户管理" }
+        }
+      ]
+    }
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "uni-app",
+    "navigationBarBackgroundColor": "#F8F8F8",
+    "backgroundColor": "#F8F8F8"
+  },
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+    }
   }
-  
+}
