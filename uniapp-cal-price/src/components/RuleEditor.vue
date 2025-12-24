@@ -43,7 +43,7 @@
       <!-- 运费（弹窗编辑 + 摘要用 RuleViewer 多行展示） -->
       <view class="card">
         <view class="card-head">
-          <view class="card-title">运费（按 KG/CBM）</view>
+          <view class="card-title">运费（按 KG/CBM/件）</view>
           <button size="mini" @click="openUnitPopup">编辑</button>
         </view>
 
@@ -51,7 +51,7 @@
           <template v-if="hasRules(form.unit_price_rules)">
             <RuleViewer :rules="form.unit_price_rules" />
           </template>
-          <view v-else class="empty">暂无规则，点击右上角“编辑”添加</view>
+          <view v-else class="empty">暂无规则，点击右上角"编辑"添加</view>
         </view>
       </view>
 
@@ -85,7 +85,7 @@
           <template v-if="hasRules(form.delivery_fee_rules)">
             <RuleViewer :rules="form.delivery_fee_rules" />
           </template>
-          <view v-else class="empty">暂无规则，点击右上角“编辑”添加</view>
+          <view v-else class="empty">暂无规则，点击右上角"编辑"添加</view>
         </view>
       </view>
 

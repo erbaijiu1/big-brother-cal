@@ -45,6 +45,7 @@ const unitOf = (r) => {
   if (!U) return ''
   if (U.includes('CBM') || U.includes('M3')) return 'CBM'
   if (U.includes('KG')) return 'KG'
+  if (U.includes('PCS') || U.includes('件')) return '件'
   return U   // 兜底展示原值（极少数自定义单位）
 }
 const rangeText = (r) => {
@@ -73,12 +74,21 @@ const priceDesc = (r) => {
   if (r?.prize !== undefined && r?.prize !== null && r?.prize !== '') {
     return `一口价 ${stripZeros(r.prize)} 元`
   }
-  // 单价 + 基础费 + 包多少
+  // 单价 + 基础费 + 包多少 + 最小计费单位
   const unit = unitOf(r) || ''
   const up = (r?.unit_price ?? r?.price)
   const segs = []
   if (up !== undefined && up !== null && String(up) !== '') {
-    segs.push(`单价 ${stripZeros(up)} 元${unit ? '/' + unit : ''}`)
+    let priceText = `单价 ${stripZeros(up)} 元`
+    if (unit) {
+      const minimumUnit = r?.minimum_unit !== undefined ? r.minimum_unit : 1
+      if (minimumUnit !== 1) {
+        priceText += `/${stripZeros(minimumUnit)}${unit}`
+      } else {
+        priceText += `/${unit}`
+      }
+    }
+    segs.push(priceText)
   }
   if (r?.base_fees !== undefined && r?.base_fees !== '') {
     segs.push(`${stripZeros(r.base_fees)} 元`)

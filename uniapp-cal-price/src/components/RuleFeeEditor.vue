@@ -11,17 +11,21 @@
           <label class="radio" @click="setUnit('CBM')" :aria-checked="activeUnit === 'CBM'" role="radio">
             <view class="dot" :class="{ on: activeUnit === 'CBM' }"></view><text>CBM</text>
           </label>
+          <label class="radio" @click="setUnit('PCS')" :aria-checked="activeUnit === 'PCS'" role="radio">
+            <view class="dot" :class="{ on: activeUnit === 'PCS' }"></view><text>件</text>
+          </label>
         </view>
       </view>
     </view>
 
-    <!-- 统一用“区间表格”，每行可填“单价”或“一口价” -->
+    <!-- 区间表格（KG/CBM/PCS 统一） -->
     <view class="thead sticky">
       <text class="col-range">区间范围</text>
       <text class="col-price">单价(/{{ activeUnit }})</text>
       <text class="col-prize">一口价(总价)</text>
       <text class="col-base">基础费(最低)</text>
-      <text class="col-deduct">包多少</text>
+      <text class="col-deduct">包多少({{ activeUnit }})</text>
+      <text class="col-step" v-if="activeUnit === 'PCS'">最小计费单位</text>
       <text class="col-action"></text>
     </view>
 
@@ -39,6 +43,9 @@
 
       <uni-easyinput class="col-base" type="number" v-model="r.base_fees" placeholder="可选" />
       <uni-easyinput class="col-deduct" type="number" v-model="r.deduction_value" placeholder="可选" />
+      
+      <!-- 最小计费单位（仅件计费显示） -->
+      <uni-easyinput v-if="activeUnit === 'PCS'" class="col-step" type="number" v-model="r._minimum_unit" placeholder="默认1" />
 
       <view class="col-action">
         <button size="mini" type="warn" plain @click="removeRow(i)">删</button>
@@ -82,6 +89,7 @@ function pickUnit(obj, def = 'KG') {
   const u = toUpper(raw, def)
   if (u.includes('KG')) return 'KG'
   if (u.includes('CBM') || u.includes('M3')) return 'CBM'
+  if (u.includes('PCS') || u.includes('件')) return 'PCS'
   return u || def
 }
 function cleanNumForInput(v) {
@@ -147,11 +155,12 @@ function isBlankRow(r) {
          isEmpty(r._prize) &&
          isEmpty(r.base_fees) &&
          isEmpty(r.deduction_value) &&
+         isEmpty(r._minimum_unit) &&
          (!r.range || r.range === '')
 }
 
 function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
-  // 仅校验“非空白行”，允许该单位完全为空（CBM 可为空）
+  // 仅校验"非空白行"，允许该单位完全为空（CBM 可为空）
   const rows = (group.rows || []).filter(r => !isBlankRow(r))
   const issues = []
   if (rows.length === 0) return issues
@@ -174,7 +183,7 @@ function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
     }
     if (min >= max) issues.push(`${unitLabel} 第 ${i + 1} 行区间应满足 min < max`)
 
-    // 至少有“单价”或“一口价”之一
+    // 至少有"单价"或"一口价"之一
     const hasUnitPrice = r.unit_price !== '' && !isNaN(Number(r.unit_price))
     const hasPrize     = r._prize     !== '' && !isNaN(Number(r._prize))
     if (!hasUnitPrice && !hasPrize) {
@@ -186,7 +195,7 @@ function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
 
   if (issues.length) return issues
 
-  // 仅检查“中间的”：相邻区间不得重叠、不得断档
+  // 仅检查"中间的"：相邻区间不得重叠、不得断档
   ranges = ranges.filter(Boolean).sort((a, b) => a.min - b.min)
   for (let i = 1; i < ranges.length; i++) {
     const p = ranges[i - 1]
@@ -204,6 +213,7 @@ function validateTierCoverageAndOverlap(group, unitLabel = 'KG') {
 const state = reactive({
   KG:  { rows: [] },
   CBM: { rows: [] },
+  PCS: { rows: [] }
 })
 const activeUnit = ref('KG')
 const curr = computed(() => state[activeUnit.value])
@@ -212,6 +222,7 @@ const curr = computed(() => state[activeUnit.value])
 function ingest(arr) {
   state.KG.rows = []
   state.CBM.rows = []
+  state.PCS.rows = []
 
   ;(arr || []).forEach(raw => {
     const unit = pickUnit(raw, 'KG')
@@ -239,17 +250,20 @@ function ingest(arr) {
       _prize: rowPrize,
       base_fees:        cleanNumForInput(firstNonNil(raw, 'base_fees', 'base_fee', 'basic_fee', '基础费')),
       deduction_value:  cleanNumForInput(firstNonNil(raw, 'deduction_value', 'deduct', 'deduction', '扣减')),
+      _minimum_unit:  cleanNumForInput(firstNonNil(raw, 'minimum_unit', 'step_size', 'stepSize', '最小计费单位', '计费步长')) || '1',
     })
   })
 
-  // 如果两侧都没有任何行，给 KG 一行空白占位
-  if (state.KG.rows.length === 0 && state.CBM.rows.length === 0) {
-    state.KG.rows.push({ range: '', _min: '', _max: '', unit_price: '', _prize: '', base_fees: '', deduction_value: '' })
+  // 如果没有任何数据，给 KG 一行空白占位
+  if (state.KG.rows.length === 0 && state.CBM.rows.length === 0 && state.PCS.rows.length === 0) {
+    state.KG.rows.push({ range: '', _min: '', _max: '', unit_price: '', _prize: '', base_fees: '', deduction_value: '', _minimum_unit: '1' })
   }
 }
 
 function emitOut() {
   const out = []
+
+  // 统一处理：KG/CBM/PCS 区间计费
   const toRows = (unit, group) => {
     (group.rows || []).forEach(r => {
       // ✅ 忽略完全空白行
@@ -262,14 +276,17 @@ function emitOut() {
       const prize = toNumOrBlank(r._prize)
       const up    = toNumOrBlank(r.unit_price)
       if (prize !== '') item.prize = prize
-      if (prize === '' && up !== '') item.unit_price = up   // 二选一：优先“一口价”
+      if (prize === '' && up !== '') item.unit_price = up   // 二选一：优先"一口价"
       const bf = toNumOrBlank(r.base_fees);       if (bf !== '') item.base_fees = bf
       const dv = toNumOrBlank(r.deduction_value); if (dv !== '') item.deduction_value = dv
+      const mu = toNumOrBlank(r._minimum_unit);     if (mu !== '' && mu !== 1) item.minimum_unit = mu  // 只有非1时才保存，兼容老数据
       out.push(item)
     })
   }
   toRows('KG',  state.KG)
   toRows('CBM', state.CBM)
+  toRows('PCS', state.PCS)
+
   emit('update:modelValue', out)
   return out
 }
@@ -282,26 +299,28 @@ function addRow() {
   curr.value.rows.push({
     range: '', _min: '', _max: '',
     unit_price: '', _prize: '',
-    base_fees: '', deduction_value: ''
+    base_fees: '', deduction_value: '', _minimum_unit: '1'
   })
 }
 function removeRow(i) { curr.value.rows.splice(i, 1); emitOut() }
 
 /* ---------- save ---------- */
 function save(silent = false) {
-  // ✅ 至少 KG/CBM 有一侧存在“非空白行”
+  // ✅ 至少 KG/CBM/PCS 有一侧存在"非空白行"
   const hasAnyRows =
     (state.KG.rows  || []).some(r => !isBlankRow(r)) ||
-    (state.CBM.rows || []).some(r => !isBlankRow(r))
+    (state.CBM.rows || []).some(r => !isBlankRow(r)) ||
+    (state.PCS.rows || []).some(r => !isBlankRow(r))
 
   if (!hasAnyRows) {
-    uni.showToast({ title: '请至少配置 KG 或 CBM 的一条区间', icon: 'none' })
+    uni.showToast({ title: '请至少配置 KG、CBM 或 件 的规则', icon: 'none' })
     return { ok: false }
   }
 
   const problems = [
     ...validateTierCoverageAndOverlap(state.KG,  'KG'),
     ...validateTierCoverageAndOverlap(state.CBM, 'CBM'),
+    ...validateTierCoverageAndOverlap(state.PCS, '件'),
   ]
   if (problems.length) {
     uni.showToast({ title: problems[0], icon: 'none' })
@@ -342,6 +361,7 @@ defineExpose({ save })
   background: #f6f8fa;
   padding: 8rpx 10rpx;
   border-radius: 8rpx;
+  margin-right: 20px;
 }
 
 .sticky {
@@ -353,6 +373,7 @@ defineExpose({ save })
 .col-range {
   flex: 1 1 220rpx;
   min-width: 200rpx;
+  /* max-width: 400rpx; */
 }
 
 .col-price {
@@ -375,6 +396,11 @@ defineExpose({ save })
   text-align: center;
 }
 
+.col-step {
+  flex: 0 0 120rpx;
+  text-align: center;
+}
+
 .col-action {
   flex: 0 0 80rpx;
   text-align: right;
@@ -391,6 +417,7 @@ defineExpose({ save })
 
 ::v-deep .uni-easyinput {
   width: 100%;
+  margin-right: 10rpx;
 }
 
 @media (max-width: 750px) {
@@ -409,7 +436,8 @@ defineExpose({ save })
   .col-price,
   .col-prize,
   .col-base,
-  .col-deduct {
+  .col-deduct,
+  .col-step {
     flex: 1 1 calc(50% - 12rpx);
     min-width: 42%;
     text-align: left;
