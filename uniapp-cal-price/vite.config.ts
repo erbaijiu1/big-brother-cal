@@ -11,5 +11,12 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src')   // 让 @ 指向 src
     }
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        silenceDeprecations: ['legacy-js-api', 'global-builtin', 'import']
+      }
+    }
   }
 })
