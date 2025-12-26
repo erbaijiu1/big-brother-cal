@@ -7,6 +7,7 @@ from api_model.api_request import LoginForm
 from db.db_models import AdminUser
 from db.sqlalchemy_define import get_db
 from server_mgr.jwt_helper import create_access_token
+from utils.logger_config import logger
 
 router = APIRouter(prefix="/auth", tags=["认证管理"])
 
@@ -30,6 +31,7 @@ async def login(form: LoginForm, db: Session = Depends(get_db)):
     ).first()
 
     if not user:
+        logger.error(f"用户名不存在: {form.username}")
         try:
             bcrypt.verify(form.password, DUMMY_HASH)  # 防止时序攻击
         except Exception:

@@ -1,4 +1,5 @@
 import json
+import math
 from typing import Optional, Dict, Any, List, Tuple
 
 from fastapi import HTTPException
@@ -16,8 +17,9 @@ from utils.logger_config import logger
 
 class QuoteRequest(BaseModel):
     category_id: int = Field(..., description="分类ID")
-    weight: float = Field(..., description="重量 KG")
-    volume: float = Field(..., description="体积 CBM")
+    weight: float = Field(0.0, description="重量 KG")
+    volume: float = Field(0.0, description="体积 CBM")
+    quantity: int = Field(0, description="件数（PCS）")
     extra_fee_data: Optional[Dict[str, Any]] = Field(
         default_factory=dict,
         description="附加上下文参数"
@@ -49,11 +51,19 @@ def calculate_range_fee(value: float, rules: List[Dict[str, Any]]):
             if 'prize' in rule:
                 return rule['prize'], rule
             if 'unit_price' in rule:
-                base = rule.get('base_fees', 0)
                 v = value - rule.get('deduction_value', 0)
+
+                min_unit = rule.get('minimum_unit', 0)
+                if min_unit > 0:
+                    v = max(v, value)
+                    v = math.ceil(v / min_unit)
+
                 if v <= 0:
                     v = 0.0
+
+                base = rule.get('base_fees', 0)
                 return round(base + v * rule['unit_price'], 2), rule
+
     return 0.0, None
 
 
@@ -134,22 +144,30 @@ def calculate_surcharge_with_breakdown(
     return breakdown
 
 
-def get_type_max_fee(price_rules: str, volume: float, weight: float, details: List[FeeDetail], name: str, cn_name: str, extra_fee_data: Dict[str, Any]) -> float:
+def get_type_max_fee(price_rules: str, volume: float, weight: float, quantity: int, details: List[FeeDetail], name: str, cn_name: str, extra_fee_data: Dict[str, Any]) -> float:
     if not price_rules or len(price_rules)<=0 :
         return 0.0
 
-    # 1. 单价费用
     unit_rules = json.loads(price_rules)
-    kg_unit_rules = [r for r in unit_rules if r['prize_type'] == 'KG']
-    cbm_unit_rules = [r for r in unit_rules if r['prize_type'] == 'CBM']
+    # 原有KG/CBM处理逻辑（保持不变）
+    kg_unit_rules = [r for r in unit_rules if r.get('prize_type') == 'KG']
+    cbm_unit_rules = [r for r in unit_rules if r.get('prize_type') == 'CBM']
+    pcs_unit_rules = [r for r in unit_rules if r.get('prize_type') == 'PCS']
     # 如果没有 CBM 规则，刚CBM转换成KG , 一立方等于200公斤, 向上取整，2位
     if not cbm_unit_rules:
         weight = max(round(volume * 200, 2), weight)
 
     kg_price, w_unit_rule = calculate_range_fee(weight, kg_unit_rules)
     cbm_price, v_unit_rule = calculate_range_fee(volume, cbm_unit_rules)
-    unit_price = max(kg_price, cbm_price)
-    target_rule, target_unit = (w_unit_rule, weight) if kg_price >= cbm_price else (v_unit_rule, volume)
+    pcs_price, pcs_unit_rule = calculate_range_fee(quantity, pcs_unit_rules)
+
+    # 取最大的数据返回
+    unit_price = max(kg_price, cbm_price, pcs_price)
+    target_rule, target_unit = w_unit_rule, weight
+    if cbm_price == unit_price:
+        target_rule, target_unit = v_unit_rule, volume
+    if pcs_price == unit_price:
+        target_rule, target_unit = pcs_unit_rule, quantity
 
     # 增加我们要挣的钱
     if name in config.EXTRA_FEE_ITEMS and not extra_fee_data.get('is_inner', False):
@@ -172,6 +190,7 @@ def calculate_total_price(
     rule: PricingRule,
     weight: float,
     volume: float,
+    quantity: int,
     extra_fee_data: Dict[str, Any]
 ) -> Tuple[float, Any, List[FeeDetail]]:
     """
@@ -181,10 +200,10 @@ def calculate_total_price(
     details: List[FeeDetail] = []
     try:
         # 1. 运输费用
-        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, details, 'unit_price', '运输费用', extra_fee_data)
+        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, quantity, details, 'unit_price', '运输费用', extra_fee_data)
 
         # 2. 派送费
-        delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, details, 'delivery_fee', '派送费', extra_fee_data)
+        delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, quantity, details, 'delivery_fee', '派送费', extra_fee_data)
 
         # 3. 附加费（新结构）
         channel_cfg = get_channel_config_by_channel(rule.channel)
@@ -370,6 +389,7 @@ async def get_pricing_for_web_comm(data):
     category_id = data.category_id
     weight = data.weight
     volume = data.volume
+    quantity = data.quantity
     extra_fee_data = data.extra_fee_data
 
     try:
@@ -382,7 +402,7 @@ async def get_pricing_for_web_comm(data):
                     logger.info(f"Skipping rule, channel: {rule.channel}, rule id:{rule.id}")
                     continue
 
-                total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, extra_fee_data)
+                total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, quantity, extra_fee_data)
                 if total_price <= 0:
                     continue
                 if total_price < rule.min_consumption:

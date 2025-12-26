@@ -24,3 +24,6 @@ cal_price_server/server_mgr/pricing_utils.py~
 cal_price_server/test/test.txt~
 uniapp-cal-price/package-lock.json
 cal_price_server/utils/__pycache__/logger_config.cpython-310.pyc
+cal_price_server/.DS_Store
+cal_price_server/api/for_inner/__pycache__/pricing_inner_api.cpython-310.pyc
+.DS_Store

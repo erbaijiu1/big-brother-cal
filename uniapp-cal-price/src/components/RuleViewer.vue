@@ -81,8 +81,8 @@ const priceDesc = (r) => {
   if (up !== undefined && up !== null && String(up) !== '') {
     let priceText = `单价 ${stripZeros(up)} 元`
     if (unit) {
-      const minimumUnit = r?.minimum_unit !== undefined ? r.minimum_unit : 1
-      if (minimumUnit !== 1) {
+      const minimumUnit = r?.minimum_unit ?? 0  // 默认0(不限制)
+      if (minimumUnit > 0) {  // 只有大于0时才显示具体数值
         priceText += `/${stripZeros(minimumUnit)}${unit}`
       } else {
         priceText += `/${unit}`

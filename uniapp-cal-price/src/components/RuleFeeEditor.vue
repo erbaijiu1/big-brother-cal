@@ -45,7 +45,7 @@
       <uni-easyinput class="col-deduct" type="number" v-model="r.deduction_value" placeholder="可选" />
       
       <!-- 最小计费单位（仅件计费显示） -->
-      <uni-easyinput v-if="activeUnit === 'PCS'" class="col-step" type="number" v-model="r._minimum_unit" placeholder="默认1" />
+      <uni-easyinput v-if="activeUnit === 'PCS'" class="col-step" type="number" v-model="r._minimum_unit" placeholder="默认0(不限制)" />
 
       <view class="col-action">
         <button size="mini" type="warn" plain @click="removeRow(i)">删</button>
@@ -250,13 +250,13 @@ function ingest(arr) {
       _prize: rowPrize,
       base_fees:        cleanNumForInput(firstNonNil(raw, 'base_fees', 'base_fee', 'basic_fee', '基础费')),
       deduction_value:  cleanNumForInput(firstNonNil(raw, 'deduction_value', 'deduct', 'deduction', '扣减')),
-      _minimum_unit:  cleanNumForInput(firstNonNil(raw, 'minimum_unit', 'step_size', 'stepSize', '最小计费单位', '计费步长')) || '1',
+      _minimum_unit:  cleanNumForInput(firstNonNil(raw, 'minimum_unit', 'step_size', 'stepSize', '最小计费单位', '计费步长')) || '0',
     })
   })
 
   // 如果没有任何数据，给 KG 一行空白占位
   if (state.KG.rows.length === 0 && state.CBM.rows.length === 0 && state.PCS.rows.length === 0) {
-    state.KG.rows.push({ range: '', _min: '', _max: '', unit_price: '', _prize: '', base_fees: '', deduction_value: '', _minimum_unit: '1' })
+    state.KG.rows.push({ range: '', _min: '', _max: '', unit_price: '', _prize: '', base_fees: '', deduction_value: '', _minimum_unit: '0' })
   }
 }
 
@@ -279,7 +279,7 @@ function emitOut() {
       if (prize === '' && up !== '') item.unit_price = up   // 二选一：优先"一口价"
       const bf = toNumOrBlank(r.base_fees);       if (bf !== '') item.base_fees = bf
       const dv = toNumOrBlank(r.deduction_value); if (dv !== '') item.deduction_value = dv
-      const mu = toNumOrBlank(r._minimum_unit);     if (mu !== '' && mu !== 1) item.minimum_unit = mu  // 只有非1时才保存，兼容老数据
+      const mu = toNumOrBlank(r._minimum_unit);     if (mu !== '' && mu !== 0) item.minimum_unit = mu  // 只有非0时才保存，兼容老数据
       out.push(item)
     })
   }
@@ -299,7 +299,7 @@ function addRow() {
   curr.value.rows.push({
     range: '', _min: '', _max: '',
     unit_price: '', _prize: '',
-    base_fees: '', deduction_value: '', _minimum_unit: '1'
+    base_fees: '', deduction_value: '', _minimum_unit: '0'
   })
 }
 function removeRow(i) { curr.value.rows.splice(i, 1); emitOut() }
