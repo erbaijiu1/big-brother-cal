@@ -1,0 +1,24 @@
+// 全局 Sass 配置文件
+// 使用现代 Sass API
+
+@use "sass:color" as color;
+@use "sass:math" as math;
+
+// 全局变量定义
+$primary-color: #007aff;
+$error-color: #e64340;
+$success-color: #07C160;
+$warning-color: #ff9800;
+
+// 通用混合器
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
