@@ -7,12 +7,24 @@
       <text class="col-desc">价格说明</text>
     </view>
 
-    <view v-for="(rule, idx) in ruleArr" :key="idx" class="viewer-row">
+    <!-- 通用规则 -->
+    <view v-for="(rule, idx) in ruleArr" :key="'gen-'+idx" class="viewer-row">
       <text class="col-unit">{{ unitOf(rule) || '-' }}</text>
-      <!-- <text class="col-type">{{ rule.prize ? '一口价' : '按区间' }}</text> -->
       <text class="col-range">{{ rangeText(rule) }}</text>
       <text class="col-desc">{{ priceDesc(rule) }}</text>
     </view>
+    
+    <!-- 特定区域规则 -->
+    <template v-for="(rRule, rIdx) in regionRuleList" :key="'reg-'+rIdx">
+      <view class="region-header">
+        <text class="region-tag">{{ getRegionLabel(rRule) }}</text>
+      </view>
+      <view v-for="(rule, idx) in getFeeRules(rRule)" :key="'reg-'+rIdx+'-'+idx" class="viewer-row region-row">
+        <text class="col-unit">{{ unitOf(rule) || '-' }}</text>
+        <text class="col-range">{{ rangeText(rule) }}</text>
+        <text class="col-desc">{{ priceDesc(rule) }}</text>
+      </view>
+    </template>
   </view>
 </template>
 
@@ -22,7 +34,9 @@ import { computed } from 'vue'
 const DEFAULT_MAX = 99999999
 
 const props = defineProps({
-  rules: { type: [Array, String], default: () => [] }
+  rules: { type: [Array, String], default: () => [] },
+  regionRules: { type: [Array, String], default: () => [] },
+  feeType: { type: String, default: '' } // unit_price_rules | delivery_fee_rules
 })
 
 /* ========= utils ========= */
@@ -33,6 +47,29 @@ const toArray = (val) => {
   }
   return []
 }
+
+// 提取特定区域规则中，符合当前费用类型的规则
+const regionRuleList = computed(() => {
+  const arr = toArray(props.regionRules)
+  if (!props.feeType) return []
+  // 过滤出含有对应费用规则的区域配置
+  return arr.filter(r => {
+    const rules = toArray(r[props.feeType])
+    return rules.length > 0
+  })
+})
+
+const getFeeRules = (rRule) => {
+  return toArray(rRule[props.feeType])
+}
+
+const getRegionLabel = (rRule) => {
+  const typeMap = { category: '分类', district: '行政区', sub_district: '子区' }
+  const typeName = typeMap[rRule.regionType] || '区域'
+  const count = (rRule.regionIds || []).length
+  return `[${typeName}: 由${count}个区域指定]`
+}
+
 const stripZeros = (v) => {
   if (v === '' || v === undefined || v === null) return ''
   const n = Number(v)
@@ -129,5 +166,21 @@ const ruleArr = computed(() => toArray(props.rules))
   flex: 3 3 800rpx;
   color: #34495e;
   word-break: break-all;
+}
+
+.region-header {
+  padding: 8rpx 0;
+  margin-top: 8rpx;
+  border-top: 1px dashed #eee;
+}
+.region-tag {
+  font-size: 24rpx;
+  color: #e67e22;
+  background: #fff5e6;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+.region-row text {
+  color: #666;
 }
 </style>

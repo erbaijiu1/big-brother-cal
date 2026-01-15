@@ -26,6 +26,7 @@ class PricingRuleBase(BaseModel):
     compensation_policy: Optional[str] = Field("", description="赔付规则")
     status: Optional[int] = Field(1, description="状态, 1=正常")
     filter_rules: Any = Field(default_factory=list, description="过滤规则（JSON数组）")
+    region_rules: Any = Field(default_factory=list, description="特定地区规则（JSON数组）")
 
 class PricingRuleCreate(PricingRuleBase):
     pass

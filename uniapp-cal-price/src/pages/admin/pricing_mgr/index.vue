@@ -49,11 +49,19 @@
         <text class="method">{{ row.transport_method || '-' }}</text>
 
         <view class="trans_fee_rules">
-          <RuleViewer :rules="row.unit_price_rules" />
+          <RuleViewer 
+            :rules="row.unit_price_rules"
+            :region-rules="row.region_rules"
+            fee-type="unit_price_rules"
+          />
         </view>
 
         <view class="delivery_fee_rules">
-          <RuleViewer :rules="row.delivery_fee_rules" />
+          <RuleViewer 
+            :rules="row.delivery_fee_rules"
+            :region-rules="row.region_rules"
+            fee-type="delivery_fee_rules"
+          />
         </view>
 
         <text class="remark" :title="row.remark">{{ row.remark }}</text>
@@ -160,6 +168,7 @@ async function fetchData() {
     unit_price_rules: toArr(item.unit_price_rules),
     surcharge_fee_rules: toArr(item.surcharge_fee_rules),
     delivery_fee_rules: toArr(item.delivery_fee_rules),
+    region_rules: toArr(item.region_rules)
   }))
   total.value = res?.total || 0
 }
@@ -232,7 +241,8 @@ function showEditDialog(row = null) {
       remark: row.remark ?? '',
       compensation_policy: row.compensation_policy ?? '',
       status: Number(row.status ?? 1),
-      filter_rules: row.filter_rules ?? ''
+      filter_rules: row.filter_rules ?? '',
+      region_rules: toArr(row.region_rules)
     }
   } else {
     editDialog.form = {

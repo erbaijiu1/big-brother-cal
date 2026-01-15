@@ -24,7 +24,7 @@
           }
         },
         {
-          "path": "pricing_cal/index",  // 对应 pages/admin/pricing_cal/index
+          "path": "pricing_cal/index",
           "style": {
             "navigationBarTitleText": "渠道成本计算"
           }
@@ -48,6 +48,10 @@
         {
           "path": "user_mgr/index",
           "style": { "navigationBarTitleText": "用户管理" }
+        },
+        {
+          "path": "region_rule/index",
+          "style": { "navigationBarTitleText": "区域计费规则" }
         }
       ]
     }

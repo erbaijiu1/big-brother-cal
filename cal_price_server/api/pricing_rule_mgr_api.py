@@ -46,7 +46,8 @@ async def list_pricing(
             "remark": obj.remark,
             "compensation_policy": obj.compensation_policy,
             "status": obj.status,
-            "filter_rules": obj.filter_rules
+            "filter_rules": obj.filter_rules,
+            "region_rules": obj.region_rules
         }
     return {"data": [serialize(x) for x in items], "total": total}
 
@@ -139,6 +140,7 @@ def update_pricing(id: int, model: PricingRuleCreate, db: Session = Depends(get_
     obj.compensation_policy = model.compensation_policy
     obj.status = model.status
     obj.filter_rules = json.dumps(model.filter_rules, ensure_ascii=False)
+    obj.region_rules = json.dumps(model.region_rules, ensure_ascii=False)
 
     db.commit()
     db.refresh(obj)

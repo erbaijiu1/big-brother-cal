@@ -1,0 +1,3 @@
+-- 修改字段类型或注释
+ALTER TABLE t_pricing_rule
+add COLUMN region_rules TEXT NULL COMMENT '区域规则数组，JSON格式';

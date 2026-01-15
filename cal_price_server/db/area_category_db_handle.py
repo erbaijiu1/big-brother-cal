@@ -44,7 +44,7 @@ def _get_joined_data_from_cache() -> Dict[int, List[Dict]]:
             category_dict = {cat.id: cat for cat in categories}
             sub_district_dict = {sd.id: sd for sd in sub_districts}
 
-            # 使用defaultdict组织数据，以category_id为键
+            # 使用default dict组织数据，以category_id为键
             result_map = defaultdict(list)
 
             # 关联三张表的数据

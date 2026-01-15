@@ -155,7 +155,7 @@ function isBlankRow(r) {
          isEmpty(r._prize) &&
          isEmpty(r.base_fees) &&
          isEmpty(r.deduction_value) &&
-         isEmpty(r._minimum_unit) &&
+         (isEmpty(r._minimum_unit) || r._minimum_unit === '0' || r._minimum_unit === 0) &&
          (!r.range || r.range === '')
 }
 
@@ -257,6 +257,13 @@ function ingest(arr) {
   // 如果没有任何数据，给 KG 一行空白占位
   if (state.KG.rows.length === 0 && state.CBM.rows.length === 0 && state.PCS.rows.length === 0) {
     state.KG.rows.push({ range: '', _min: '', _max: '', unit_price: '', _prize: '', base_fees: '', deduction_value: '', _minimum_unit: '0' })
+  }
+
+  // Auto-switch to a unit with data if current is empty
+  if (state[activeUnit.value].rows.length === 0) {
+    if (state.KG.rows.length > 0) activeUnit.value = 'KG'
+    else if (state.CBM.rows.length > 0) activeUnit.value = 'CBM'
+    else if (state.PCS.rows.length > 0) activeUnit.value = 'PCS'
   }
 }
 

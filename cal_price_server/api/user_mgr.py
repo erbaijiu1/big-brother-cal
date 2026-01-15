@@ -38,7 +38,7 @@ class AdminUserResponse(BaseModel):
     status: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 # ==== 超级管理员验证依赖 ====

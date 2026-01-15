@@ -17,7 +17,7 @@ class SubDistrictUpdate(BaseModel):
 class SubDistrictOut(SubDistrictBase):
     id: int
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class DistrictBase(BaseModel):
     name_cn: str
@@ -29,7 +29,7 @@ class DistrictCreate(DistrictBase):
 class DistrictOut(DistrictBase):
     id: int
     subs: List[SubDistrictOut] = []
-    class Config: orm_mode = True
+    class Config: from_attributes = True
 
 
 class AreaCategoryBase(BaseModel):
@@ -42,4 +42,4 @@ class AreaCategoryOut(AreaCategoryBase):
     id: int
     sub_ids: List[int] = []
     class Config:
-        orm_mode = True
+        from_attributes = True

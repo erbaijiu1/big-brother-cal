@@ -1,12 +1,15 @@
 import json
 import math
+from base64 import urlsafe_b64encode
 from typing import Optional, Dict, Any, List, Tuple
+from urllib.parse import urlencode
 
+from cffi.cffi_opcode import PRIM_UINT_LEAST8
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 import config
-from db.area_category_db_handle import get_sub_district_names_by_category_ids
+from db.area_category_db_handle import get_sub_district_names_by_category_ids, get_sub_districts_by_category_id
 from db.channel_db_handle import get_channel_config_by_channel
 from db.db_models import PricingRule
 from db.district_db_handle import get_districts_by_ids
@@ -199,11 +202,18 @@ def calculate_total_price(
     """
     details: List[FeeDetail] = []
     try:
+        # 兼容旧的规则
+        if not rule.region_rules:
+            unit_price_rules, delivery_fee_rules = rule.unit_price_rules, rule.delivery_fee_rules
+        else:
+            # 应该是这里，遍历region_rules里的每一条不是default的规则，得到 unit_price_rules, delivery_fee_rules
+            unit_price_rules, delivery_fee_rules = get_region_rules(rule.region_rules, extra_fee_data)
+
         # 1. 运输费用
-        unit_price = get_type_max_fee(rule.unit_price_rules, volume, weight, quantity, details, 'unit_price', '运输费用', extra_fee_data)
+        unit_price = get_type_max_fee(unit_price_rules, volume, weight, quantity, details, 'unit_price', '运输费用', extra_fee_data)
 
         # 2. 派送费
-        delivery = get_type_max_fee(rule.delivery_fee_rules, volume, weight, quantity, details, 'delivery_fee', '派送费', extra_fee_data)
+        delivery = get_type_max_fee(delivery_fee_rules, volume, weight, quantity, details, 'delivery_fee', '派送费', extra_fee_data)
 
         # 3. 附加费（新结构）
         channel_cfg = get_channel_config_by_channel(rule.channel)
@@ -392,6 +402,10 @@ async def get_pricing_for_web_comm(data):
     quantity = data.quantity
     extra_fee_data = data.extra_fee_data
 
+    # 从请求中提取区域信息
+    request_district = extra_fee_data.get('district', '')
+    request_sub_district = extra_fee_data.get('sub_district', '')
+
     try:
         rules = get_pricing_rule_by_category_id(category_id)
         quote_list = []
@@ -399,7 +413,7 @@ async def get_pricing_for_web_comm(data):
         for rule in rules:
             try:
                 if check_if_channel_rule_filter(rule, extra_fee_data, weight, volume):
-                    logger.info(f"Skipping rule, channel: {rule.channel}, rule id:{rule.id}")
+                    logger.info(f"跳过规则, 渠道: {rule.channel}, 规则ID: {rule.id}")
                     continue
 
                 total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, quantity, extra_fee_data)
@@ -413,17 +427,64 @@ async def get_pricing_for_web_comm(data):
                     "transport_method": rule.transport_method,
                     "warehouse": rule.warehouse,
                     "total_price": round(total_price, 2),
-                    "rule_id": rule.id
-                    , "remark": channel_conf.remark if channel_conf else ""
-                    , "fee_details": fee_details
+                    "rule_id": rule.id,
+                    "remark": channel_conf.remark if channel_conf else "",
+                    "fee_details": fee_details
                 })
-                logger.info(f"Quote for channel {rule.channel} is {total_price}, fees:{fee_details}")
+                logger.info(f"渠道 {rule.channel} 报价为 {total_price}, 费用详情:{fee_details}")
             except Exception as e:
-                logger.error(f"Failed to calculate quote for channel {rule.channel}, rule_id:{rule.id}: {e}", exc_info=True)
+                logger.error(f"计算渠道 {rule.channel} 报价失败, 规则ID:{rule.id}: {e}", exc_info=True)
 
         sorted_quotes = sorted(quote_list, key=lambda x: x['total_price'])
         return {"code": 200, "message": "success", "data": sorted_quotes}
 
     except Exception as e:
-        logger.error(f"Failed to fetch quote list: {e}")
+        logger.error(f"获取报价列表失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_region_rules(region_rules, extra_fee_data):
+    district = extra_fee_data.get('district', '')
+    sub_district = extra_fee_data.get('sub_district', '')
+
+    # 获取非default的区域规则
+    special_region_rules = [x for x in region_rules if x.get("isDefault") == False]
+    for rule in special_region_rules:
+        if rule.get("regionType") == "district" and district not in rule.get("regionIds"):
+            continue
+        if rule.get("regionType") == "subDistrict" and sub_district not in rule.get("regionIds"):
+            continue
+
+        if rule.get("regionType") == "areaCategory":
+            try:
+                rule_ids_str = rule.get("regionIds")
+                rule_ids_json = json.loads(rule_ids_str) if rule_ids_str else []
+                rule_ids = [int(x) for x in rule_ids_json]
+                if not rule_ids:
+                    continue
+
+                all_rule_subs_ids = []
+                for x in rule_ids:
+                    all_rule_subs_ids.extend(get_sub_districts_by_category_id(x))
+
+                if not all_rule_subs_ids:
+                    continue
+
+                if sub_district not in all_rule_subs_ids:
+                    continue
+
+            except Exception as e:
+                logger.exception(f"Error in get_region_rules: {e}")
+                continue
+
+        # 找到匹配的特殊规则，立即返回
+        return (rule.get("unit_price_rules"),
+                rule.get("delivery_fee_rules") )
+
+    # 如果没有找到匹配的特殊规则，返回默认规则
+    default_region_rule = next((x for x in region_rules if x.get("isDefault") == True), None)
+    if default_region_rule:
+        return (default_region_rule.get("unit_price_rules"),
+                default_region_rule.get("delivery_fee_rules"))
+    else:
+        return [], []
