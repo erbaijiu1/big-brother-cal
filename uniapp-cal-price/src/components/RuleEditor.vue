@@ -107,20 +107,22 @@
               </view>
 
               <!-- 对应分类的规则编辑器 -->
-              <view v-show="currentRegionRuleType === 'category'">
+              <view v-show="currentRegionRuleType === 'area_category'">
                 <view class="editor-section">
-                  <view class="section-title">【类别】运费规则</view>
+                  <view class="section-title">【自定义区域】运费规则</view>
                   <RuleFeeEditor
+                    ref="catUnitRef"
                     key="cat-unit"
-                    v-model="typeRules.category.unit_price_rules"
+                    v-model="typeRules.area_category.unit_price_rules"
                     dense
                   />
                 </view>
                 <view class="editor-section" style="margin-top:20rpx;">
-                  <view class="section-title">【类别】派送费规则</view>
+                  <view class="section-title">【自定义区域】派送费规则</view>
                   <RuleFeeEditor
+                    ref="catDeliveryRef"
                     key="cat-delivery"
-                    v-model="typeRules.category.delivery_fee_rules"
+                    v-model="typeRules.area_category.delivery_fee_rules"
                     dense
                   />
                 </view>
@@ -131,6 +133,7 @@
                 <view class="editor-section">
                   <view class="section-title">【行政区】运费规则</view>
                   <RuleFeeEditor
+                    ref="distUnitRef"
                     key="dist-unit"
                     v-model="typeRules.district.unit_price_rules"
                     dense
@@ -139,6 +142,7 @@
                 <view class="editor-section" style="margin-top:20rpx;">
                   <view class="section-title">【行政区】派送费规则</view>
                   <RuleFeeEditor
+                    ref="distDeliveryRef"
                     key="dist-delivery"
                     v-model="typeRules.district.delivery_fee_rules"
                     dense
@@ -151,6 +155,7 @@
                 <view class="editor-section">
                   <view class="section-title">【子区】运费规则</view>
                   <RuleFeeEditor
+                    ref="subUnitRef"
                     key="sub-unit"
                     v-model="typeRules.sub_district.unit_price_rules"
                     dense
@@ -159,6 +164,7 @@
                 <view class="editor-section" style="margin-top:20rpx;">
                   <view class="section-title">【子区】派送费规则</view>
                   <RuleFeeEditor
+                    ref="subDeliveryRef"
                     key="sub-delivery"
                     v-model="typeRules.sub_district.delivery_fee_rules"
                     dense
@@ -205,14 +211,14 @@ const statusOptions = [
 /* ===== 区域定价设置 ===== */
 const activeRegionTab = ref(0) // 0=general, 1=specific
 
-// 当前选中的特定规则类型：category | district | sub_district
-const currentRegionRuleType = ref('category')
+// 当前选中的特定规则类型：area_category | district | sub_district
+const currentRegionRuleType = ref('area_category')
 
 // 存储三种类型的单例规则
 const typeRules = reactive({
-  category:     { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] },
-  district:     { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] },
-  sub_district: { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] }
+  area_category: { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] },
+  district:      { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] },
+  sub_district:  { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] }
 })
 
 // 固定两个标签页：通用规则和特定区域规则
@@ -235,7 +241,7 @@ function onRegionTypeSwitch(type) {
 const combinedSelectedRegions = computed({
   get() {
     return [
-      ...typeRules.category._selectedRegions,
+      ...typeRules.area_category._selectedRegions,
       ...typeRules.district._selectedRegions,
       ...typeRules.sub_district._selectedRegions
     ]
@@ -243,11 +249,11 @@ const combinedSelectedRegions = computed({
   set(val) {
     // RegionSelector 返回的是所有选中的项（含 updated list）
     // 我们需要按类型拆回 typeRules
-    const cats = val.filter(x => x.type === 'category')
+    const cats = val.filter(x => x.type === 'area_category')
     const dists = val.filter(x => x.type === 'district')
     const subs = val.filter(x => x.type === 'sub_district')
     
-    typeRules.category._selectedRegions = cats
+    typeRules.area_category._selectedRegions = cats
     typeRules.district._selectedRegions = dists
     typeRules.sub_district._selectedRegions = subs
   }
@@ -270,6 +276,13 @@ function onDefaultDeliverySaved(payload) {
 // 默认规则编辑器引用
 const defaultUnitEditorRef = ref(null)
 const defaultDeliveryEditorRef = ref(null)
+// 特定规则编辑器引用
+const catUnitRef = ref(null)
+const catDeliveryRef = ref(null)
+const distUnitRef = ref(null)
+const distDeliveryRef = ref(null)
+const subUnitRef = ref(null)
+const subDeliveryRef = ref(null)
 
 /* ===== props / emits ===== */
 const props = defineProps({
@@ -311,7 +324,7 @@ watch(() => form.region_rules, (rules) => {
   if (!Array.isArray(rules)) return
   
   // 清空现有
-  typeRules.category = { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] }
+  typeRules.area_category = { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] }
   typeRules.district = { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] }
   typeRules.sub_district = { unit_price_rules: [], delivery_fee_rules: [], _selectedRegions: [] }
 
@@ -323,13 +336,18 @@ watch(() => form.region_rules, (rules) => {
       typeRules[type].unit_price_rules = arr(r.unit_price_rules)
       typeRules[type].delivery_fee_rules = arr(r.delivery_fee_rules)
       typeRules[type]._selectedRegions = (r.regionIds || []).map(id => ({ id, type }))
+    } else if (type === 'category' && typeRules.area_category.unit_price_rules.length === 0) {
+       // 兼容旧数据：把 category 映射 to area_category
+       typeRules.area_category.unit_price_rules = arr(r.unit_price_rules)
+       typeRules.area_category.delivery_fee_rules = arr(r.delivery_fee_rules)
+       typeRules.area_category._selectedRegions = (r.regionIds || []).map(id => ({ id, type: 'area_category' }))
     }
   })
   
   // 初始化 Tab：如果有数据，默认选中第一个有数据的 Tab；否则默认 category
   if (typeRules.sub_district.unit_price_rules.length > 0) currentRegionRuleType.value = 'sub_district'
   else if (typeRules.district.unit_price_rules.length > 0) currentRegionRuleType.value = 'district'
-  else currentRegionRuleType.value = 'category'
+  else currentRegionRuleType.value = 'area_category'
   
 }, { immediate: true })
 
@@ -420,6 +438,36 @@ async function syncChildEditors() {
 
   const d = defaultDeliveryEditorRef.value?.save?.(true)
   if (d && d.ok) form.delivery_fee_rules = d.data || form.delivery_fee_rules
+
+  // 同步特定规则编辑器 (Category)
+  if (catUnitRef.value) {
+    const cu = catUnitRef.value.save?.(true)
+    if (cu && cu.ok) typeRules.area_category.unit_price_rules = cu.data
+  }
+  if (catDeliveryRef.value) {
+    const cd = catDeliveryRef.value.save?.(true)
+    if (cd && cd.ok) typeRules.area_category.delivery_fee_rules = cd.data
+  }
+
+  // 同步特定规则编辑器 (District)
+  if (distUnitRef.value) {
+    const du = distUnitRef.value.save?.(true)
+    if (du && du.ok) typeRules.district.unit_price_rules = du.data
+  }
+  if (distDeliveryRef.value) {
+    const dd = distDeliveryRef.value.save?.(true)
+    if (dd && dd.ok) typeRules.district.delivery_fee_rules = dd.data
+  }
+
+  // 同步特定规则编辑器 (SubDistrict)
+  if (subUnitRef.value) {
+    const su = subUnitRef.value.save?.(true)
+    if (su && su.ok) typeRules.sub_district.unit_price_rules = su.data
+  }
+  if (subDeliveryRef.value) {
+    const sd = subDeliveryRef.value.save?.(true)
+    if (sd && sd.ok) typeRules.sub_district.delivery_fee_rules = sd.data
+  }
 }
 
 /* ===== 工具/兼容 ===== */
@@ -504,12 +552,12 @@ function normalizeOut(src) {
   }
 
   // Category
-  if (hasContent(typeRules.category)) {
+  if (hasContent(typeRules.area_category)) {
     specificRules.push({
-      regionType: 'category',
-      regionIds: typeRules.category._selectedRegions.map(r => r.id),
-      unit_price_rules: typeRules.category.unit_price_rules,
-      delivery_fee_rules: typeRules.category.delivery_fee_rules,
+      regionType: 'area_category',
+      regionIds: typeRules.area_category._selectedRegions.map(r => r.id),
+      unit_price_rules: typeRules.area_category.unit_price_rules,
+      delivery_fee_rules: typeRules.area_category.delivery_fee_rules,
       surcharge_fee_rules: []
     })
   }

@@ -25,7 +25,7 @@
       <text class="col-prize">一口价(总价)</text>
       <text class="col-base">基础费(最低)</text>
       <text class="col-deduct">包多少({{ activeUnit }})</text>
-      <text class="col-step" v-if="activeUnit === 'PCS'">最小计费单位</text>
+      <text class="col-step" v-if="activeUnit === 'PCS'">起订量</text>
       <text class="col-action"></text>
     </view>
 
@@ -44,7 +44,7 @@
       <uni-easyinput class="col-base" type="number" v-model="r.base_fees" placeholder="可选" />
       <uni-easyinput class="col-deduct" type="number" v-model="r.deduction_value" placeholder="可选" />
       
-      <!-- 最小计费单位（仅件计费显示） -->
+      <!-- 起订量（仅件计费显示） -->
       <uni-easyinput v-if="activeUnit === 'PCS'" class="col-step" type="number" v-model="r._minimum_unit" placeholder="默认0(不限制)" />
 
       <view class="col-action">
@@ -250,7 +250,7 @@ function ingest(arr) {
       _prize: rowPrize,
       base_fees:        cleanNumForInput(firstNonNil(raw, 'base_fees', 'base_fee', 'basic_fee', '基础费')),
       deduction_value:  cleanNumForInput(firstNonNil(raw, 'deduction_value', 'deduct', 'deduction', '扣减')),
-      _minimum_unit:  cleanNumForInput(firstNonNil(raw, 'minimum_unit', 'step_size', 'stepSize', '最小计费单位', '计费步长')) || '0',
+      _minimum_unit:  cleanNumForInput(firstNonNil(raw, 'minimum_unit', 'step_size', 'stepSize', '起订量', '计费步长')) || '0',
     })
   })
 

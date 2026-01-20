@@ -103,7 +103,7 @@ const props = defineProps({
   },
   regionType: {
     type: String,
-    default: 'category' // 'category' | 'district' | 'sub_district'
+    default: 'area_category' // 'area_category' | 'district' | 'sub_district'
   },
   hideTabs: {
     type: Boolean,
@@ -117,7 +117,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'update:regionType'])
 
-const tabs = ['类别', '行政区', '子区']
+const tabs = ['自定义区域', '行政区', '子区']
 const currentTab = ref(0)
 const onTabChange = (e) => {
   if (typeof e === 'number') {
@@ -141,7 +141,7 @@ const selectedSubDistrictIds = ref([])
 
 // 根据当前选项卡设置区域类型
 watch(currentTab, (tab) => {
-  const typeMap = { 0: 'category', 1: 'district', 2: 'sub_district' }
+  const typeMap = { 0: 'area_category', 1: 'district', 2: 'sub_district' }
   emit('update:regionType', typeMap[tab])
   
   // 如果是独占模式，切换tab时触发一次emit，以便清空其他类型的选择
@@ -323,7 +323,7 @@ function emitSelection() {
   const shouldCollectAll = !props.exclusiveType
   
   if (shouldCollectAll || currentTab.value === 0) {
-    selectedItems.push(...selectedCategoryIds.value.map(id => ({ id, type: 'category' })))
+    selectedItems.push(...selectedCategoryIds.value.map(id => ({ id, type: 'area_category' })))
   }
   
   if (shouldCollectAll || currentTab.value === 1) {
@@ -347,7 +347,7 @@ function clearSelection() {
 
 // 根据外部传入的regionType设置当前选项卡
 watch(() => props.regionType, (type) => {
-  const tabMap = { category: 0, district: 1, sub_district: 2 }
+  const tabMap = { 'area_category': 0, 'district': 1, 'sub_district': 2 }
   currentTab.value = tabMap[type] || 0
 }, { immediate: true })
 
@@ -356,7 +356,7 @@ watch(() => props.modelValue, (newVal) => {
   const val = Array.isArray(newVal) ? newVal : []
   
   selectedCategoryIds.value = val
-    .filter(item => item.type === 'category')
+    .filter(item => item.type === 'area_category')
     .map(item => String(item.id))
     
   selectedDistrictIds.value = val

@@ -126,3 +126,10 @@ def get_district_list() -> List[District]:
     except Exception as e:
         logger.error(f"Error occurred while querying district list: {e}")
         raise
+
+def get_district_name_by_id(district_id):
+    """
+    根据ID获取District名称，从缓存中获取
+    """
+    district = get_district_by_id(district_id)
+    return district.name_cn if district else None

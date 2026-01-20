@@ -172,3 +172,7 @@ def get_remote_sub_districts() -> List[SubDistrict]:
     except Exception as e:
         logger.error(f"Error occurred while querying remote sub districts: {e}")
         raise
+
+def get_sub_district_name_by_sub_id(subs_id):
+    subs_item = get_sub_district_by_id(subs_id)
+    return subs_item.name_cn if subs_item else None

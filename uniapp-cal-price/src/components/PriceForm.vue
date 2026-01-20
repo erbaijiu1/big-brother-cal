@@ -96,7 +96,8 @@
 
 <script lang="js">
 import { calculateVolumetricWeight, calculateChargeWeight } from '@/common/utils/calculator'
-import hkDistricts from '@/common/hk_districts.json'
+// import hkDistricts from '@/common/hk_districts.json' // 废弃 JSON，改用 API
+import { getDistricts } from '@/api/district'
 import { request } from '@/common/utils/request'
 import { BASE_URL } from '@/common/config'
 
@@ -128,7 +129,7 @@ export default {
       volume: null,
       pieces: 1, // 默认1件
 
-      districts: hkDistricts,
+      districts: [], // hkDistricts,
       subDistricts: [],
       selectedDistrict: null,
       selectedDistrictName: '',
@@ -165,6 +166,7 @@ export default {
 
   mounted() {
     this.loadCategories()
+    this.loadDistricts()
     
     // 小程序环境检测
     // #ifdef MP-WEIXIN
@@ -206,6 +208,29 @@ export default {
       }
     },
 
+    // 加载行政区（API）
+    async loadDistricts() {
+      try {
+        const res = await getDistricts()
+        const data = Array.isArray(res) ? res : (res?.data || [])
+        // 映射 API 数据结构到组件需要的格式
+        this.districts = data.map(d => ({
+          id: d.id,
+          district_cn: d.name_cn,
+          district_en: d.name_en,
+          sub_districts: (d.subs || []).map(s => ({
+            id: s.id,
+            sub_cn: s.name_cn,
+            sub_en: s.name_en,
+            remote: s.is_remote
+          }))
+        }))
+      } catch (e) {
+        console.error('行政区加载失败:', e)
+        uni.showToast({ title: '加载行政区失败', icon: 'none' })
+      }
+    },
+
     // 分类变更
     onCategoryChange(e) {
       const index = e.detail.value
@@ -216,14 +241,15 @@ export default {
       this.emitFormChange()
     },
 
-
-
     // 地址变更
     onDistrictChange(e) {
       const idx = e.detail.value
       const district = this.districts[idx]
-      this.selectedDistrict = district.district_cn
+      // 存储 ID
+      this.selectedDistrict = district.id
+      // 展示 Name
       this.selectedDistrictName = district.district_cn
+      
       this.subDistricts = district.sub_districts
       this.selectedSubDistrict = null
       this.selectedSubDistrictName = ''
@@ -234,8 +260,11 @@ export default {
     onSubDistrictChange(e) {
       const idx = e.detail.value
       const sub = this.subDistricts[idx]
-      this.selectedSubDistrict = sub.sub_cn
+      // 存储 ID
+      this.selectedSubDistrict = sub.id
+      // 展示 Name
       this.selectedSubDistrictName = sub.sub_cn
+      
       this.isRemote = sub.remote
       this.emitFormChange()
     },

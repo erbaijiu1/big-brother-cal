@@ -64,7 +64,7 @@ const getFeeRules = (rRule) => {
 }
 
 const getRegionLabel = (rRule) => {
-  const typeMap = { category: '分类', district: '行政区', sub_district: '子区' }
+  const typeMap = { area_category: '自定义区域', district: '行政区', sub_district: '子区' }
   const typeName = typeMap[rRule.regionType] || '区域'
   const count = (rRule.regionIds || []).length
   return `[${typeName}: 由${count}个区域指定]`
@@ -111,7 +111,7 @@ const priceDesc = (r) => {
   if (r?.prize !== undefined && r?.prize !== null && r?.prize !== '') {
     return `一口价 ${stripZeros(r.prize)} 元`
   }
-  // 单价 + 基础费 + 包多少 + 最小计费单位
+  // 单价 + 基础费 + 包多少 + 起订量
   const unit = unitOf(r) || ''
   const up = (r?.unit_price ?? r?.price)
   const segs = []
