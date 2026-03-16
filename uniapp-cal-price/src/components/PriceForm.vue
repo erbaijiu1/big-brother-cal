@@ -11,16 +11,58 @@
       <view v-if="selectedCategorySub" class="sub-category-desc">举例：{{ selectedCategorySub }}</view>
     </view>
 
-    <!-- 重量和体积输入 -->
-    <view class="form-row">
-      <view class="form-item flex-1">
-        <text class="label">重量（kg）</text>
-        <input type="digit" v-model.number="weight" placeholder="请输入实重" class="input" />
-        <view class="field-tip">称重所得的真实重量</view>
+    <!-- 重量输入 -->
+    <view class="form-item">
+      <text class="label">重量（kg）</text>
+      <input type="digit" v-model.number="weight" placeholder="请输入实重" class="input" />
+      <view class="field-tip">称重所得的真实重量</view>
+    </view>
+
+    <!-- 体积输入 -->
+    <view class="form-item">
+      <view class="label-with-action">
+        <text class="label">体积（m³）</text>
+        <text class="toggle-action" @click="toggleInputMode">
+          {{ inputMode === 'lwh' ? '直接输入体积' : '输入长宽高' }}
+        </text>
       </view>
 
-      <view class="form-item flex-1">
-        <text class="label">体积（m³）</text>
+      <!-- 长宽高输入模式 -->
+      <view v-if="inputMode === 'lwh'" class="lwh-container">
+        <view class="lwh-row">
+          <view class="lwh-group">
+            <text class="lwh-label">长(cm)</text>
+            <view class="stepper">
+              <text class="step-btn" @click="stepValue('length', -1)">-</text>
+              <input class="lwh-input" type="digit" v-model.number="length" placeholder="长" confirm-type="next" @confirm="focusInput('width')" :focus="focusField === 'length'" />
+              <text class="step-btn" @click="stepValue('length', 1)">+</text>
+            </view>
+          </view>
+          <view class="lwh-group">
+            <text class="lwh-label">宽(cm)</text>
+            <view class="stepper">
+              <text class="step-btn" @click="stepValue('width', -1)">-</text>
+              <input class="lwh-input" type="digit" v-model.number="width" placeholder="宽" confirm-type="next" @confirm="focusInput('height')" :focus="focusField === 'width'" />
+              <text class="step-btn" @click="stepValue('width', 1)">+</text>
+            </view>
+          </view>
+          <view class="lwh-group">
+            <text class="lwh-label">高(cm)</text>
+            <view class="stepper">
+              <text class="step-btn" @click="stepValue('height', -1)">-</text>
+              <input class="lwh-input" type="digit" v-model.number="height" placeholder="高" confirm-type="done" @confirm="focusInput('')" :focus="focusField === 'height'" />
+              <text class="step-btn" @click="stepValue('height', 1)">+</text>
+            </view>
+          </view>
+        </view>
+        <view class="field-tip lwh-tip">
+          <text v-if="calculatedVolume > 0" class="auto-volume">自动计算体积: {{ calculatedVolume }} m³</text>
+          <text v-else>体积重公式：体积 × 200 ≈ kg</text>
+        </view>
+      </view>
+
+      <!-- 直接输入体积模式 -->
+      <view v-else>
         <input type="digit" v-model.number="volume" placeholder="体积选填：如0.02" class="input" />
         <view class="field-tip">体积重公式：体积 × 200 ≈ kg</view>
       </view>
@@ -127,6 +169,11 @@ export default {
 
       weight: null,
       volume: null,
+      inputMode: 'lwh', // 'lwh' 或 'volume'
+      length: null,
+      width: null,
+      height: null,
+      focusField: '', // 用于控制焦点
       pieces: 1, // 默认1件
 
       districts: [], // hkDistricts,
@@ -144,6 +191,12 @@ export default {
   },
 
   computed: {
+    calculatedVolume() {
+      if (this.length > 0 && this.width > 0 && this.height > 0) {
+        return parseFloat(((this.length * this.width * this.height) / 1000000).toFixed(6))
+      }
+      return null
+    },
     volumetricWeight() {
       if (!this.volume && this.volume !== 0) return null
       return calculateVolumetricWeight(this.volume)
@@ -161,7 +214,19 @@ export default {
   watch: {
     weight(val) { if (val === '') this.weight = null },
     volume(val) { if (val === '') this.volume = null },
-    pieces(val) { if (val === '' || val === null || val < 1) this.pieces = 1 }
+    pieces(val) { if (val === '' || val === null || val < 1) this.pieces = 1 },
+    calculatedVolume(val) {
+      if (this.inputMode === 'lwh') {
+        this.volume = val
+      }
+    },
+    inputMode(val) {
+      if (val === 'lwh') {
+        this.volume = this.calculatedVolume
+      } else {
+        this.focusField = ''
+      }
+    }
   },
 
   mounted() {
@@ -269,6 +334,27 @@ export default {
       this.emitFormChange()
     },
 
+    // 切换输入模式
+    toggleInputMode() {
+      this.inputMode = this.inputMode === 'lwh' ? 'volume' : 'lwh'
+    },
+
+    // 步进值加减
+    stepValue(field, delta) {
+      let val = Number(this[field]) || 0
+      val += delta
+      if (val < 0) val = 0
+      this[field] = val
+      
+      // 触发视图焦点逻辑，保证连续点击时不丢焦
+      // this.focusField = field
+    },
+
+    // 自动定位下一个输入框
+    focusInput(field) {
+      this.focusField = field
+    },
+
     // 上楼相关变更
     onNeedGoUpstairsChange(e) {
       this.needGoUpstairs = (e.detail && e.detail.value) ? e.detail.value : e.target.value
@@ -340,7 +426,11 @@ export default {
         sub_district: this.selectedSubDistrict,
         is_remote: this.isRemote,
         has_elevator: this.hasElevator,
-        need_stairs: this.needStairs
+        need_stairs: this.needStairs,
+        input_mode: this.inputMode,
+        length: this.length || 0,
+        width: this.width || 0,
+        height: this.height || 0
       }
 
       let baseData = {
@@ -378,6 +468,9 @@ export default {
           category_id: this.selectedCategory,
           weight: this.weight,
           volume: this.volume,
+          length: this.length,
+          width: this.width,
+          height: this.height,
           pieces: this.pieces,
           district: this.selectedDistrict,
           sub_district: this.selectedSubDistrict,
@@ -504,5 +597,84 @@ export default {
   min-height: 100vh;
   overflow-y: auto;
   position: relative;
+}
+
+/* ================= 长宽高功能样式 ================= */
+.label-with-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.toggle-action {
+  font-size: 26rpx;
+  color: #007aff;
+  cursor: pointer;
+  padding: 4rpx 12rpx;
+}
+
+.lwh-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.lwh-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.lwh-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.lwh-label {
+  font-size: 24rpx;
+  color: #666;
+  margin-bottom: 8rpx;
+  text-align: center;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ccc;
+  border-radius: 12rpx;
+  overflow: hidden;
+  height: 64rpx;
+  background: #fff;
+}
+
+.step-btn {
+  width: 48rpx;
+  text-align: center;
+  line-height: 64rpx;
+  font-size: 32rpx;
+  color: #333;
+  background: #f4f4f4;
+}
+
+.step-btn:active {
+  background: #e0e0e0;
+}
+
+.lwh-input {
+  flex: 1;
+  text-align: center;
+  font-size: 26rpx;
+  height: 100%;
+  min-width: 0;
+  background: #fff;
+}
+
+.lwh-tip {
+  margin-top: 16rpx;
+}
+.auto-volume {
+  color: #ff5722;
+  font-weight: bold;
 }
 </style>
