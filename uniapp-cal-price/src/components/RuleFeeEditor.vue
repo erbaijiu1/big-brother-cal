@@ -320,8 +320,8 @@ function save(silent = false) {
     (state.PCS.rows || []).some(r => !isBlankRow(r))
 
   if (!hasAnyRows) {
-    uni.showToast({ title: '请至少配置 KG、CBM 或 件 的规则', icon: 'none' })
-    return { ok: false }
+    if (!silent) uni.showToast({ title: '请至少配置 KG、CBM 或 件 的规则', icon: 'none' })
+    return { ok: false, empty: true }
   }
 
   const problems = [

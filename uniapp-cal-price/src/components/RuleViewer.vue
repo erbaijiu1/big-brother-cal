@@ -65,6 +65,18 @@ const getFeeRules = (rRule) => {
 
 const getRegionLabel = (rRule) => {
   const typeMap = { area_category: '自定义区域', district: '行政区', sub_district: '子区' }
+  
+  // New Structure Support
+  if (rRule.region_conf && Array.isArray(rRule.region_conf)) {
+    const parts = rRule.region_conf.map(c => {
+      const name = typeMap[c.regionType] || '区域'
+      const count = (c.regionIds || []).length
+      return `[${name}: ${count}个]`
+    })
+    return parts.join(' ') || '未指定区域'
+  }
+
+  // Old Structure Fallback
   const typeName = typeMap[rRule.regionType] || '区域'
   const count = (rRule.regionIds || []).length
   return `[${typeName}: 由${count}个区域指定]`

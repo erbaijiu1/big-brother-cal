@@ -454,19 +454,46 @@ def get_region_rules(region_rules, extra_fee_data):
     # 获取区域规则
     region_rule_list = json.loads(region_rules) if region_rules else []
     for rule in region_rule_list:
-        rule_ids_json = rule.get("regionIds", [])
-        rule_ids = [int(x) for x in rule_ids_json]
+        # 新逻辑：支持 region_conf 列表 (OR 关系)
+        if "region_conf" in rule and isinstance(rule["region_conf"], list):
+            matched_any = False
+            for conf in rule["region_conf"]:
+                r_type = conf.get("regionType")
+                r_ids_json = conf.get("regionIds", [])
+                r_ids = [int(x) for x in r_ids_json]
 
-        if rule.get("regionType") == "district" and district not in rule_ids:
-            continue
-        if rule.get("regionType") == "sub_district" and sub_district not in rule_ids:
-            continue
-        if rule.get("regionType") == "area_category" and not match_area_category(rule, sub_district):
-            continue
+                if r_type == "district":
+                    if district in r_ids:
+                        matched_any = True
+                        break
+                elif r_type == "sub_district":
+                    if sub_district in r_ids:
+                        matched_any = True
+                        break
+                elif r_type == "area_category":
+                    # 构造一个临时对象以复用 match_area_category
+                    temp_rule = {"regionIds": r_ids_json}
+                    if match_area_category(temp_rule, sub_district):
+                        matched_any = True
+                        break
+            
+            if matched_any:
+                return rule.get("unit_price_rules"), rule.get("delivery_fee_rules")
 
-        # 找到匹配的特殊规则，立即返回
-        return (rule.get("unit_price_rules"),
-                rule.get("delivery_fee_rules") )
+        # 旧逻辑：直接读取外层字段
+        else:
+            rule_ids_json = rule.get("regionIds", [])
+            rule_ids = [int(x) for x in rule_ids_json]
+
+            if rule.get("regionType") == "district" and district not in rule_ids:
+                continue
+            if rule.get("regionType") == "sub_district" and sub_district not in rule_ids:
+                continue
+            if rule.get("regionType") == "area_category" and not match_area_category(rule, sub_district):
+                continue
+
+            # 找到匹配的特殊规则，立即返回
+            return rule.get("unit_price_rules"), rule.get("delivery_fee_rules")
 
     else:
         return [], []
