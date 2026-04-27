@@ -1,5 +1,109 @@
 use db_prize_cal;
 show tables;
+
+CREATE TABLE IF NOT EXISTS t_consignment_trade (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    order_no VARCHAR(64) NOT NULL COMMENT '排单编号',
+    row_uuid VARCHAR(64) DEFAULT NULL COMMENT '源系统行UUID',
+    scheduling_time VARCHAR(32) DEFAULT NULL COMMENT '排单时间',
+    shipping_channel VARCHAR(64) DEFAULT NULL COMMENT '托运渠道',
+    salesman VARCHAR(64) DEFAULT NULL COMMENT '业务员',
+    shipping_customer VARCHAR(128) DEFAULT NULL COMMENT '托运客户',
+    shipping_code VARCHAR(64) DEFAULT NULL COMMENT '托运编码',
+    shipping_date VARCHAR(32) DEFAULT NULL COMMENT '出货日期',
+    scheduling_status VARCHAR(32) DEFAULT NULL COMMENT '调度状态',
+    shipper VARCHAR(128) DEFAULT NULL COMMENT '发货人',
+    delivery_time VARCHAR(32) DEFAULT NULL COMMENT '托运日期',
+    receiving_address TEXT COMMENT '收货地址',
+    go_upstairs VARCHAR(16) DEFAULT NULL COMMENT '是否上楼',
+    logistics_tracking TEXT COMMENT '物流跟踪',
+    settlement_status VARCHAR(32) DEFAULT NULL COMMENT '结算状态',
+    payment_status VARCHAR(32) DEFAULT NULL COMMENT '收款状态',
+    payment_method VARCHAR(64) DEFAULT NULL COMMENT '收款方式',
+    remark TEXT COMMENT '备注说明',
+    source_page_no INT DEFAULT 1 COMMENT '来源页码',
+    raw_row_json LONGTEXT COMMENT '原始行JSON',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_order_no (order_no),
+    KEY idx_shipping_date (shipping_date),
+    KEY idx_scheduling_time (scheduling_time),
+    KEY idx_shipping_channel (shipping_channel),
+    KEY idx_shipping_code (shipping_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='托运排单抓取数据';
+
+CREATE TABLE IF NOT EXISTS t_performance_statement (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+    
+    -- 【系统与溯源控制】(建议保留这些防坑)
+    record_key VARCHAR(128) NOT NULL COMMENT '业务唯一键（优先业务单号，回退uuid/哈希）',
+    row_uuid VARCHAR(64) DEFAULT NULL COMMENT '源系统行UUID',
+    source_page_no INT DEFAULT 1 COMMENT '来源页码',
+    order_id VARCHAR(32) DEFAULT NULL COMMENT '系统内部ID (AutoID)',
+    
+    -- 【核心维度】
+    shipping_date DATE DEFAULT NULL COMMENT '托运日期',
+    shipping_channel VARCHAR(64) DEFAULT NULL COMMENT '托运渠道',
+    salesman VARCHAR(64) DEFAULT NULL COMMENT '业务员',
+    shipping_no VARCHAR(64) DEFAULT NULL COMMENT '托运号码',
+    follow_up_no VARCHAR(64) DEFAULT NULL COMMENT '跟单码/单号',
+    
+    -- 【金额与成本 (核心利润指标)】
+    shipping_cost DECIMAL(12, 2) DEFAULT 0.00 COMMENT '托运成本',
+    deduct_cost DECIMAL(12, 2) DEFAULT 0.00 COMMENT '扣除成本',
+    shipping_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '托运费',
+    invoice_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '开票费',
+    adjust_profit DECIMAL(12, 2) DEFAULT 0.00 COMMENT '调整利润',
+    actual_performance DECIMAL(12, 2) DEFAULT 0.00 COMMENT '实际业绩(利润)',
+    
+    -- 【杂费明细】
+    forklift_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '叉车费',
+    pallet_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '卡板费',
+    ad_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '广告费',
+    huolala_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '货拉拉费用',
+    pickup_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '提货费',
+    advance_freight_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '代付运费',
+    advance_misc_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '代付杂费',
+    other_fee DECIMAL(12, 2) DEFAULT 0.00 COMMENT '其他费用',
+    reimbursement_amount DECIMAL(12, 2) DEFAULT 0.00 COMMENT '报销金额',
+
+    -- 【收款与财务状态】
+    payment_status VARCHAR(32) DEFAULT NULL COMMENT '收款状态',
+    payment_method VARCHAR(64) DEFAULT NULL COMMENT '收款方式',
+    payment_date DATE DEFAULT NULL COMMENT '收款日期',
+    reconciliation_date DATE DEFAULT NULL COMMENT '对账日期',
+    salesman_payment_date DATE DEFAULT NULL COMMENT '业务员收款日期',
+
+    -- 【货物详情】
+    company_tracking_no VARCHAR(64) DEFAULT NULL COMMENT '公司单号',
+    ship_to VARCHAR(255) DEFAULT NULL COMMENT '收货单位',
+    product_name VARCHAR(255) DEFAULT NULL COMMENT '产品名称',
+    goods_count INT DEFAULT 0 COMMENT '件数',
+    goods_weight DECIMAL(12, 3) DEFAULT 0.000 COMMENT '重量(KG)',
+    goods_volume DECIMAL(12, 3) DEFAULT 0.000 COMMENT '体积(CBM)',
+    
+    remark TEXT COMMENT '备注',
+    
+    -- 【原始数据备查】(爬虫必须留的后悔药)
+    row_text_json LONGTEXT COMMENT '按表头映射后的行JSON',
+    raw_row_json LONGTEXT COMMENT '原始行JSON',
+    
+    -- 【审计字段】
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_record_key (record_key),
+    KEY idx_row_uuid (row_uuid),
+    KEY idx_shipping_date (shipping_date),
+    KEY idx_salesman (salesman),
+    KEY idx_channel (shipping_channel),
+    KEY idx_tracking (company_tracking_no),
+    KEY idx_payment_status (payment_status),
+    KEY idx_reconciliation_date (reconciliation_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务利润与业绩明细表';
+
 INSERT INTO t_goods_classification
 (main_category, sub_examples, description, temperature_req, hazard_level, storage_level)
 VALUES
