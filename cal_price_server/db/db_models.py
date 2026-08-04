@@ -9,7 +9,7 @@ from utils.logger_config import logger
 Base = declarative_base()
 
 
-from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float, Boolean
+from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float, Boolean, ForeignKey
 
 
 class GoodsClassification(Base):
@@ -59,6 +59,9 @@ class ChannelConfig(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键")
     channel_code = Column(String(20), nullable=False, default='', comment="渠道编码，如 普A")
     channel_name = Column(String(100), nullable=False, default='', comment="对应渠道名称，如 港利发")
+    receiving_address = Column(Text, nullable=True, default='', comment="渠道收货地址")
+    customer_quote_config = Column(Text, nullable=True, default='', comment="对客报价展示配置 JSON")
+    config_updated_at = Column(DateTime, nullable=True, server_default=text("CURRENT_TIMESTAMP"), comment="对客配置更新时间")
     surcharge_rules = Column(Text, nullable=True, default='', comment="附加费规则 JSON，结构包含 surcharges 列表")
     filter_rules = Column(Text, nullable=True, default='', comment="过滤规则 JSON，结构包含 filters 列表")
     # 新增一个备注字段
@@ -73,6 +76,18 @@ class ChannelConfig(Base):
 
     def __repr__(self):
         return f"<ChannelSurchargeConfig(channel_code='{self.channel_code}', channel_name='{self.channel_name}')>"
+
+
+class ChannelQuoteConfigHistory(Base):
+    __tablename__ = 't_channel_quote_config_history'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键")
+    channel_id = Column(Integer, ForeignKey('t_channel_config.id'), nullable=False, index=True, comment="渠道ID")
+    channel_code = Column(String(20), nullable=False, comment="渠道编码快照")
+    config_snapshot = Column(Text, nullable=False, comment="对客报价配置快照 JSON")
+    changed_by_id = Column(Integer, nullable=True, comment="操作管理员ID")
+    changed_by_name = Column(String(50), nullable=True, comment="操作管理员账号")
+    changed_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment="变更时间")
 
 class AdminUser(Base):
     __tablename__ = "admin_user"

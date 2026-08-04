@@ -19,3 +19,6 @@ MIN_EARN_MONEY = os.getenv("MIN_EARN_MONEY", 30)
 EARN_MONEY_RATIO = os.getenv("EARN_MONEY_RATIO", 0.3)
 # 加额外费用的项
 EXTRA_FEE_ITEMS = os.getenv("EXTRA_FEE_ITEMS", "unit_price")
+
+# AI 客服等内部调用方访问对客报价聚合接口时使用的服务令牌。
+CUSTOMER_QUOTE_SERVICE_TOKEN = os.getenv("CUSTOMER_QUOTE_SERVICE_TOKEN", "")

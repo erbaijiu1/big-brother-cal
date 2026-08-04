@@ -1,0 +1,25 @@
+services:
+  cal_price_server:
+    build:
+      context: .
+    image: cal-price-server:local
+    container_name: cal_price_server
+    restart: unless-stopped
+    env_file:
+      - path: ./docker_conf.env
+        required: true
+      - path: ./.env
+        required: true
+    environment:
+      DB_HOST: mysql_db
+      DB_NAME: db_prize_cal
+      DB_PORT: 3306
+    expose:
+      - "8088"
+    volumes:
+      - .:/app
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    networks:
+      - web

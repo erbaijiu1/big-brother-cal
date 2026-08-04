@@ -8,6 +8,8 @@ from api.user_concact import router as contact_router
 from utils.logger_config import logger as logging
 from api import channel_mgr_api, goods_classify_mgr, pricing_rule_mgr_api, district_mgr, area_category_mgr, user_mgr, auth_router
 from api.for_inner.pricing_inner_api import router as inner_router
+from api.for_inner.channel_info_api import router as channel_info_router
+from api.for_inner.customer_quote_api import router as customer_quote_router
 from api.memu_api import router as menu_router
 
 app = FastAPI()
@@ -23,6 +25,8 @@ app.include_router(area_category_mgr.router, prefix="/cal_price")
 app.include_router(user_mgr.router, prefix="/cal_price")
 app.include_router(auth_router.router, prefix="/cal_price")
 app.include_router(inner_router, prefix="/cal_price")
+app.include_router(channel_info_router, prefix="/cal_price")
+app.include_router(customer_quote_router, prefix="/cal_price")
 app.include_router(menu_router, prefix="/cal_price")
 
 
