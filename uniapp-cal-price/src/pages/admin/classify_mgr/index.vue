@@ -87,6 +87,41 @@
           <uni-forms-item name="priority" label="优先级">
             <uni-easyinput v-model="editDialog.form.priority" type="number" placeholder="数字越小优先级越高" />
           </uni-forms-item>
+          <uni-forms-item name="warehouse_acceptance_policy" label="入仓策略">
+            <uni-data-select
+              v-model="editDialog.form.warehouse_acceptance_policy"
+              :localdata="acceptancePolicyOptions"
+            />
+          </uni-forms-item>
+          <uni-forms-item name="acceptance_notice" label="策略说明">
+            <uni-easyinput
+              v-model="editDialog.form.acceptance_notice"
+              type="textarea"
+              placeholder="人工确认所需资料或拒收原因"
+            />
+          </uni-forms-item>
+          <view class="tier-editor">
+            <view class="tier-title">
+              <text>对客阶梯价（只填对客价格，不填成本）</text>
+              <button size="mini" type="primary" plain @click="addPriceTier">新增区间</button>
+            </view>
+            <view
+              v-for="(tier, index) in editDialog.form.customer_price_tiers"
+              :key="index"
+              class="tier-row"
+            >
+              <uni-easyinput v-model="tier.min_quantity" type="number" placeholder="起始kg" />
+              <text>至</text>
+              <uni-easyinput v-model="tier.max_quantity" type="number" placeholder="留空=以上" />
+              <uni-easyinput v-model="tier.min_price" type="digit" placeholder="最低元/kg" />
+              <text>至</text>
+              <uni-easyinput v-model="tier.max_price" type="digit" placeholder="最高元/kg" />
+              <button size="mini" type="warn" plain @click="removePriceTier(index)">删除</button>
+            </view>
+            <text v-if="!editDialog.form.customer_price_tiers.length" class="tier-empty">
+              未配置时，AI不会对客展示阶梯价。
+            </text>
+          </view>
         </uni-forms>
         <view class="dialog-actions">
           <button @click="closeEditDialog">取消</button>
@@ -112,6 +147,11 @@ const query = reactive({
 })
 
 const searchFormRef = ref(null)
+const acceptancePolicyOptions = [
+  { value: 'AUTO_ACCEPT', text: '自动接收入仓' },
+  { value: 'MANUAL_CONFIRM', text: '人工确认后入仓' },
+  { value: 'REJECTED', text: '拒绝接收入仓' }
+]
 
 // 编辑弹窗
 const editPopup = ref(null)
@@ -125,7 +165,10 @@ const editDialog = reactive({
     temperature_req: '',
     hazard_level: '',
     storage_level: '',
-    priority: 99
+    priority: 99,
+    customer_price_tiers: [],
+    warehouse_acceptance_policy: 'MANUAL_CONFIRM',
+    acceptance_notice: ''
   }
 })
 const editFormRef = ref(null)
@@ -185,7 +228,10 @@ function showEditDialog(row = null) {
       temperature_req: row.temperature_req ?? '',
       hazard_level: row.hazard_level ?? '',
       storage_level: row.storage_level ?? '',
-      priority: typeof row.priority === 'number' ? row.priority : Number(row.priority) || 99
+      priority: typeof row.priority === 'number' ? row.priority : Number(row.priority) || 99,
+      customer_price_tiers: (row.customer_price_tiers || []).map(tier => ({ ...tier })),
+      warehouse_acceptance_policy: row.warehouse_acceptance_policy || 'MANUAL_CONFIRM',
+      acceptance_notice: row.acceptance_notice || ''
     }
   } else {
     editDialog.isEdit = false
@@ -197,7 +243,10 @@ function showEditDialog(row = null) {
       temperature_req: '',
       hazard_level: '',
       storage_level: '',
-      priority: 99
+      priority: 99,
+      customer_price_tiers: [],
+      warehouse_acceptance_policy: 'MANUAL_CONFIRM',
+      acceptance_notice: ''
     }
   }
   editPopup.value.open()
@@ -205,6 +254,20 @@ function showEditDialog(row = null) {
 
 function closeEditDialog() {
   editPopup.value.close()
+}
+
+function addPriceTier() {
+  editDialog.form.customer_price_tiers.push({
+    min_quantity: 0,
+    max_quantity: '',
+    min_price: '',
+    max_price: '',
+    unit: 'kg'
+  })
+}
+
+function removePriceTier(index) {
+  editDialog.form.customer_price_tiers.splice(index, 1)
 }
 
 async function saveCategory() {
@@ -221,7 +284,39 @@ async function saveCategory() {
       : `/cal_price/classify_mgr/`
     const method = isEdit ? 'PUT' : 'POST'
 
-    await request({ url, method, data: editDialog.form })
+    const invalidTier = editDialog.form.customer_price_tiers.some(tier => {
+      const minQuantity = Number(tier.min_quantity || 0)
+      const maxQuantity = tier.max_quantity === '' || tier.max_quantity == null
+        ? null
+        : Number(tier.max_quantity)
+      const minPrice = Number(tier.min_price)
+      const maxPrice = Number(tier.max_price)
+      return !Number.isFinite(minQuantity)
+        || minQuantity < 0
+        || (maxQuantity !== null && (!Number.isFinite(maxQuantity) || maxQuantity <= minQuantity))
+        || !Number.isFinite(minPrice)
+        || !Number.isFinite(maxPrice)
+        || minPrice < 0
+        || maxPrice < minPrice
+    })
+    if (invalidTier) {
+      uni.showToast({ title: '请检查阶梯区间和价格上下限', icon: 'none' })
+      return
+    }
+
+    const payload = {
+      ...editDialog.form,
+      customer_price_tiers: editDialog.form.customer_price_tiers.map(tier => ({
+        min_quantity: Number(tier.min_quantity || 0),
+        max_quantity: tier.max_quantity === '' || tier.max_quantity == null
+          ? null
+          : Number(tier.max_quantity),
+        min_price: Number(tier.min_price),
+        max_price: Number(tier.max_price),
+        unit: tier.unit || 'kg'
+      }))
+    }
+    await request({ url, method, data: payload })
     uni.showToast({ title: isEdit ? '保存成功' : '新增成功', icon: 'success' })
     closeEditDialog()
     fetchData()
@@ -340,4 +435,25 @@ onPullDownRefresh(() => {
   gap: 24rpx;
   margin-top: 18rpx;
 }
+.tier-editor {
+  margin-top: 16rpx;
+  padding: 18rpx;
+  border: 1px solid #e5e7eb;
+  border-radius: 10rpx;
+}
+.tier-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+  font-weight: 600;
+}
+.tier-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 10rpx;
+}
+.tier-empty { color: #909399; font-size: 24rpx; }
 </style>

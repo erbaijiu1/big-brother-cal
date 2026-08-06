@@ -59,3 +59,40 @@ def parse_customer_quote_config(value: Any) -> Dict[str, Any]:
         return parsed if isinstance(parsed, dict) else {}
     except (TypeError, ValueError):
         return {}
+
+
+def parse_customer_price_tiers(value: Any) -> list[Dict[str, Any]]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value) if value else []
+        except (TypeError, ValueError):
+            return []
+    if not isinstance(value, list):
+        return []
+
+    tiers = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            min_quantity = float(item.get("min_quantity") or 0)
+            max_value = item.get("max_quantity")
+            max_quantity = None if max_value in (None, "") else float(max_value)
+            min_price = float(item["min_price"])
+            max_price = float(item.get("max_price", min_price))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if min_quantity < 0 or min_price < 0 or max_price < min_price:
+            continue
+        if max_quantity is not None and max_quantity <= min_quantity:
+            continue
+        tiers.append(
+            {
+                "min_quantity": min_quantity,
+                "max_quantity": max_quantity,
+                "min_price": min_price,
+                "max_price": max_price,
+                "unit": str(item.get("unit") or "kg"),
+            }
+        )
+    return tiers

@@ -6,9 +6,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from api.service_auth import customer_quote_service_auth
-from db.db_models import ChannelConfig, PricingRule
+from db.db_models import ChannelConfig, GoodsClassification, PricingRule
 from db.sqlalchemy_define import get_db
-from server_mgr.customer_quote_utils import build_customer_fee_summary, parse_customer_quote_config
+from server_mgr.customer_quote_utils import (
+    build_customer_fee_summary,
+    parse_customer_price_tiers,
+    parse_customer_quote_config,
+)
 from server_mgr.pricing_utils import QuoteRequest, get_pricing_for_web_comm
 
 
@@ -25,6 +29,17 @@ LOCAL_TIMEZONE = ZoneInfo("Asia/Shanghai")
 async def calculate_customer_quote(data: QuoteRequest, db: Session = Depends(get_db)):
     legacy_result = await get_pricing_for_web_comm(data)
     options = []
+    category = db.query(GoodsClassification).filter(
+        GoodsClassification.category_id == data.category_id
+    ).first()
+    customer_price_tiers = parse_customer_price_tiers(
+        category.customer_price_tiers if category else None
+    )
+    price_tiers_updated_at = (
+        category.price_tiers_updated_at.replace(tzinfo=LOCAL_TIMEZONE).isoformat()
+        if category and category.price_tiers_updated_at
+        else None
+    )
 
     for quote in legacy_result.get("data", []):
         rule = db.query(PricingRule).filter(PricingRule.id == quote.get("rule_id")).first()
@@ -53,6 +68,8 @@ async def calculate_customer_quote(data: QuoteRequest, db: Session = Depends(get
                 **fee_summary,
                 "service_info": service_info,
                 "assumptions": assumptions,
+                "customer_price_tiers": customer_price_tiers,
+                "price_tiers_updated_at": price_tiers_updated_at,
                 "config_updated_at": (
                     channel.config_updated_at.replace(tzinfo=LOCAL_TIMEZONE).isoformat()
                     if channel and channel.config_updated_at
@@ -69,6 +86,10 @@ async def calculate_customer_quote(data: QuoteRequest, db: Session = Depends(get
             "calculated_at": datetime.now(LOCAL_TIMEZONE).isoformat(),
             "currency": "CNY",
             "input_snapshot": data.model_dump(),
+            "category_acceptance": {
+                "policy": category.warehouse_acceptance_policy if category else "MANUAL_CONFIRM",
+                "notice": category.acceptance_notice or "" if category else "分类未配置，需人工确认",
+            },
             "options": options,
         },
     }

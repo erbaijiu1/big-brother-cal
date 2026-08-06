@@ -5,7 +5,7 @@ import unittest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from server_mgr.customer_quote_utils import build_customer_fee_summary
+from server_mgr.customer_quote_utils import build_customer_fee_summary, parse_customer_price_tiers
 
 
 class TestCustomerQuoteUtils(unittest.TestCase):
@@ -48,6 +48,35 @@ class TestCustomerQuoteUtils(unittest.TestCase):
         self.assertFalse(result["minimum_applied"])
         self.assertTrue(all("rule" not in item for item in result["customer_fee_details"]))
         self.assertEqual(sum(item["amount"] for item in result["customer_fee_details"]), 205)
+
+    def test_customer_price_tiers_only_return_safe_valid_fields(self):
+        result = parse_customer_price_tiers(
+            [
+                {
+                    "min_quantity": 1,
+                    "max_quantity": 100,
+                    "min_price": 7,
+                    "max_price": 9,
+                    "unit": "kg",
+                    "internal_cost": 4.5,
+                },
+                {"min_quantity": 100, "max_quantity": 50, "min_price": 1, "max_price": 2},
+            ]
+        )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "min_quantity": 1.0,
+                    "max_quantity": 100.0,
+                    "min_price": 7.0,
+                    "max_price": 9.0,
+                    "unit": "kg",
+                }
+            ],
+        )
+        self.assertNotIn("internal_cost", result[0])
 
 
 if __name__ == "__main__":

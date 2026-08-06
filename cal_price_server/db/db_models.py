@@ -26,6 +26,22 @@ class GoodsClassification(Base):
     last_modified = Column(DateTime, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))  # 最后修改时间
     status = Column(Integer, default=0, comment='状态, 0:init, 1:ok')
     priority = Column(Integer, default=99, comment='优先级')
+    customer_price_tiers = Column(Text, nullable=True, default='', comment='对客阶梯价 JSON')
+    price_tiers_updated_at = Column(DateTime, nullable=True, server_default=text("CURRENT_TIMESTAMP"), comment='对客阶梯价更新时间')
+    warehouse_acceptance_policy = Column(String(20), nullable=False, default='MANUAL_CONFIRM', comment='入仓策略')
+    acceptance_notice = Column(String(255), nullable=True, default='', comment='入仓策略说明')
+
+
+class GoodsPriceTierHistory(Base):
+    __tablename__ = 't_goods_price_tier_history'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键ID')
+    category_id = Column(Integer, nullable=False, index=True, comment='货物分类ID')
+    main_category = Column(String(50), nullable=False, comment='分类名称快照')
+    config_snapshot = Column(Text, nullable=False, comment='对客阶梯价配置快照 JSON')
+    changed_by_id = Column(Integer, nullable=True, comment='操作管理员ID')
+    changed_by_name = Column(String(50), nullable=True, comment='操作管理员账号')
+    changed_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='变更时间')
 
 
 
