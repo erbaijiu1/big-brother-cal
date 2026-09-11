@@ -44,6 +44,32 @@ class GoodsPriceTierHistory(Base):
     changed_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='变更时间')
 
 
+class CooperationQuoteConfig(Base):
+    """长期合作客户的品类报价卡，与单票计价规则完全隔离。"""
+
+    __tablename__ = 't_cooperation_quote_config'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键ID')
+    category_id = Column(Integer, nullable=False, unique=True, index=True, comment='货物分类ID')
+    enabled = Column(Boolean, nullable=False, default=True, comment='是否启用')
+    currency = Column(String(10), nullable=False, default='CNY', comment='币种')
+    price_tiers = Column(Text, nullable=False, comment='合作阶梯价 JSON')
+    delivery_base_fee = Column(Float, nullable=True, comment='香港派送基础费用')
+    delivery_included_weight = Column(Float, nullable=True, comment='基础派送费包重 kg')
+    delivery_excess_rate = Column(Float, nullable=True, comment='超重派送费 元/kg')
+    sea_crossing_notice = Column(String(255), nullable=True, default='', comment='港岛过海说明')
+    upstairs_notice = Column(Text, nullable=True, default='', comment='上楼费用说明')
+    cutoff_text = Column(String(255), nullable=True, default='', comment='入仓截单说明')
+    eta_text = Column(String(255), nullable=True, default='', comment='运输时效说明')
+    customer_notice = Column(Text, nullable=True, default='', comment='其他对客说明')
+    config_updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        comment='配置更新时间',
+    )
+
+
 
 class PricingRule(Base):
     __tablename__ = 't_pricing_rule'

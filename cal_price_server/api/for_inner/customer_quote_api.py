@@ -2,11 +2,11 @@ from datetime import datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.service_auth import customer_quote_service_auth
-from db.db_models import ChannelConfig, GoodsClassification, PricingRule
+from db.db_models import ChannelConfig, CooperationQuoteConfig, GoodsClassification, PricingRule
 from db.sqlalchemy_define import get_db
 from server_mgr.customer_quote_utils import (
     build_customer_fee_summary,
@@ -23,6 +23,65 @@ router = APIRouter(
 )
 
 LOCAL_TIMEZONE = ZoneInfo("Asia/Shanghai")
+
+
+def _serialize_cooperation_quote(
+    config: CooperationQuoteConfig,
+    category: GoodsClassification,
+) -> dict:
+    return {
+        "category_id": category.category_id,
+        "category_name": category.main_category,
+        "enabled": bool(config.enabled),
+        "currency": config.currency,
+        "price_tiers": parse_customer_price_tiers(config.price_tiers),
+        "delivery_base_fee": config.delivery_base_fee,
+        "delivery_included_weight": config.delivery_included_weight,
+        "delivery_excess_rate": config.delivery_excess_rate,
+        "sea_crossing_notice": config.sea_crossing_notice or "",
+        "upstairs_notice": config.upstairs_notice or "",
+        "cutoff_text": config.cutoff_text or "",
+        "eta_text": config.eta_text or "",
+        "customer_notice": config.customer_notice or "",
+        "acceptance_policy": category.warehouse_acceptance_policy,
+        "acceptance_notice": category.acceptance_notice or "",
+        "config_updated_at": (
+            config.config_updated_at.replace(tzinfo=LOCAL_TIMEZONE).isoformat()
+            if config.config_updated_at
+            else None
+        ),
+    }
+
+
+@router.get("/cooperation")
+def list_cooperation_quotes(
+    category_ids: str = "",
+    db: Session = Depends(get_db),
+):
+    """按品类返回合作报价卡；未配置的品类不回退到单票阶梯价。"""
+    raw_ids = [value.strip() for value in category_ids.split(",") if value.strip()]
+    if any(not value.isdigit() for value in raw_ids):
+        raise HTTPException(status_code=422, detail="category_ids 必须是逗号分隔的整数")
+    requested_ids = {
+        int(value) for value in raw_ids
+    }
+    query = (
+        db.query(CooperationQuoteConfig, GoodsClassification)
+        .join(
+            GoodsClassification,
+            GoodsClassification.category_id == CooperationQuoteConfig.category_id,
+        )
+        .filter(CooperationQuoteConfig.enabled.is_(True))
+        .filter(GoodsClassification.status != 2)
+    )
+    if requested_ids:
+        query = query.filter(CooperationQuoteConfig.category_id.in_(requested_ids))
+    rows = query.order_by(GoodsClassification.priority, GoodsClassification.category_id).all()
+    return {
+        "code": 200,
+        "message": "success",
+        "data": [_serialize_cooperation_quote(config, category) for config, category in rows],
+    }
 
 
 @router.post("/calculate")

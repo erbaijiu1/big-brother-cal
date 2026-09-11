@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from api.login import jwt_auth
-from db.db_models import GoodsClassification, GoodsPriceTierHistory
+from db.db_models import CooperationQuoteConfig, GoodsClassification, GoodsPriceTierHistory
 from db.sqlalchemy_define import get_db
 from typing import Optional
 from datetime import datetime
@@ -45,6 +45,24 @@ def _save_tier_history(db: Session, obj: GoodsClassification, tiers: list, auth_
             changed_by_name=auth_payload.get("sub"),
         )
     )
+
+
+def _serialize_cooperation_config(config: CooperationQuoteConfig) -> dict:
+    return {
+        "category_id": config.category_id,
+        "enabled": bool(config.enabled),
+        "currency": config.currency,
+        "price_tiers": parse_customer_price_tiers(config.price_tiers),
+        "delivery_base_fee": config.delivery_base_fee,
+        "delivery_included_weight": config.delivery_included_weight,
+        "delivery_excess_rate": config.delivery_excess_rate,
+        "sea_crossing_notice": config.sea_crossing_notice or "",
+        "upstairs_notice": config.upstairs_notice or "",
+        "cutoff_text": config.cutoff_text or "",
+        "eta_text": config.eta_text or "",
+        "customer_notice": config.customer_notice or "",
+        "config_updated_at": config.config_updated_at.isoformat() if config.config_updated_at else None,
+    }
 
 @router.get("/", summary="分类分页列表")
 def list_goods(
@@ -159,6 +177,72 @@ def get_price_tier_history(id: int, db: Session = Depends(get_db)):
             for row in rows
         ]
     }
+
+
+@router.get("/{id}/cooperation-quote", summary="查询品类合作报价配置")
+def get_cooperation_quote(id: int, db: Session = Depends(get_db)):
+    config = db.query(CooperationQuoteConfig).filter(
+        CooperationQuoteConfig.category_id == id
+    ).first()
+    if not config:
+        raise HTTPException(404, "该分类尚未配置合作报价")
+    return _serialize_cooperation_config(config)
+
+
+@router.put("/{id}/cooperation-quote", summary="新增或修改品类合作报价配置")
+def save_cooperation_quote(id: int, data: dict, db: Session = Depends(get_db)):
+    category = db.query(GoodsClassification).filter(
+        GoodsClassification.category_id == id
+    ).first()
+    if not category:
+        raise HTTPException(404, "分类不存在")
+    tiers = parse_customer_price_tiers(data.get("price_tiers"))
+    if not tiers:
+        raise HTTPException(400, "合作报价至少需要一个阶梯价")
+    enabled = data.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise HTTPException(400, "enabled 必须是布尔值")
+    numeric_fields = (
+        "delivery_base_fee",
+        "delivery_included_weight",
+        "delivery_excess_rate",
+    )
+    for field in numeric_fields:
+        raw_value = data.get(field)
+        if raw_value in (None, ""):
+            data[field] = None
+            continue
+        try:
+            data[field] = float(raw_value)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(400, f"{field} 必须是数字") from exc
+        if data[field] < 0:
+            raise HTTPException(400, f"{field} 不能小于 0")
+    config = db.query(CooperationQuoteConfig).filter(
+        CooperationQuoteConfig.category_id == id
+    ).first()
+    if not config:
+        config = CooperationQuoteConfig(category_id=id, price_tiers="[]")
+        db.add(config)
+    config.enabled = enabled
+    config.currency = data.get("currency") or "CNY"
+    config.price_tiers = json.dumps(tiers, ensure_ascii=False)
+    for field in (
+        "delivery_base_fee",
+        "delivery_included_weight",
+        "delivery_excess_rate",
+        "sea_crossing_notice",
+        "upstairs_notice",
+        "cutoff_text",
+        "eta_text",
+        "customer_notice",
+    ):
+        if field in data:
+            setattr(config, field, data[field])
+    config.config_updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(config)
+    return _serialize_cooperation_config(config)
 
 @router.delete("/{id}", summary="删除分类（软删）")
 def delete_goods(id: int, db: Session = Depends(get_db)):
