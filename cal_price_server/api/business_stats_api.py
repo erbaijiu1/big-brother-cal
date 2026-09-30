@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
@@ -41,6 +41,63 @@ def _row(result: Any) -> Dict[str, Any]:
 def _validate_range(start_date: Optional[date], end_date: Optional[date]) -> None:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(422, "开始日期不能晚于结束日期")
+
+
+def _month_bounds(month: str) -> tuple[date, date]:
+    try:
+        start = datetime.strptime(f"{month}-01", "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise HTTPException(422, "月份格式必须为 YYYY-MM") from exc
+
+    if start.month == 12:
+        end = date(start.year + 1, 1, 1)
+    else:
+        end = date(start.year, start.month + 1, 1)
+    return start, end
+
+
+def _previous_month(month_start: date) -> str:
+    if month_start.month == 1:
+        return f"{month_start.year - 1}-12"
+    return f"{month_start.year}-{month_start.month - 1:02d}"
+
+
+def _change_pct(current: float, previous: float) -> Optional[float]:
+    if previous == 0:
+        return None
+    return round((current - previous) / abs(previous) * 100, 2)
+
+
+GROWTH_DIMENSIONS = {
+    "products": {
+        "label": "产品",
+        "expression": "COALESCE(NULLIF(TRIM(product_name), ''), '未知产品')",
+    },
+    "channels": {
+        "label": "渠道",
+        "expression": "COALESCE(NULLIF(TRIM(shipping_channel), ''), '未知渠道')",
+    },
+    "salesmen": {
+        "label": "业务员",
+        "expression": "COALESCE(NULLIF(TRIM(salesman), ''), '未知业务员')",
+    },
+    "weights": {
+        "label": "重量段",
+        "expression": """
+            CASE
+                WHEN goods_weight <= 0 THEN '未知/0'
+                WHEN goods_weight <= 20 THEN '0-20kg'
+                WHEN goods_weight <= 50 THEN '20-50kg'
+                WHEN goods_weight <= 100 THEN '50-100kg'
+                WHEN goods_weight <= 300 THEN '100-300kg'
+                WHEN goods_weight <= 500 THEN '300-500kg'
+                WHEN goods_weight <= 1000 THEN '500-1000kg'
+                WHEN goods_weight <= 3000 THEN '1000-3000kg'
+                ELSE '3000kg以上'
+            END
+        """,
+    },
+}
 
 
 @router.get("/overview", summary="经营统计总览")
@@ -330,5 +387,279 @@ def get_business_overview(
             "repurchase": repurchase,
             "join_quality": join_quality,
             "top_customers": top_customers,
+        },
+    }
+
+
+@router.get("/growth", summary="月度增长诊断")
+def get_monthly_growth(
+    month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    compare_month: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    db: Session = Depends(get_db),
+    auth_payload: dict = Depends(super_admin_required),
+):
+    current_start, current_end = _month_bounds(month)
+    comparison_month = compare_month or _previous_month(current_start)
+    previous_start, previous_end = _month_bounds(comparison_month)
+    if comparison_month == month:
+        raise HTTPException(422, "对比月份不能与目标月份相同")
+
+    params = {
+        "current_start": current_start,
+        "current_end": current_end,
+        "previous_start": previous_start,
+        "previous_end": previous_end,
+    }
+    summary = _row(
+        db.execute(
+            text(
+                """
+                SELECT
+                    SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
+                    SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0), 2) AS current_profit,
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0), 2) AS previous_profit,
+                    ROUND(COALESCE(AVG(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance END), 0), 2) AS current_avg_profit,
+                    ROUND(COALESCE(AVG(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance END), 0), 2) AS previous_avg_profit
+                FROM t_performance_statement
+                WHERE (shipping_date >= :current_start AND shipping_date < :current_end)
+                   OR (shipping_date >= :previous_start AND shipping_date < :previous_end)
+                """
+            ),
+            params,
+        ).mappings()
+    )
+
+    current_orders = int(summary["current_orders"] or 0)
+    previous_orders = int(summary["previous_orders"] or 0)
+    current_profit = float(summary["current_profit"] or 0)
+    previous_profit = float(summary["previous_profit"] or 0)
+    current_avg = float(summary["current_avg_profit"] or 0)
+    previous_avg = float(summary["previous_avg_profit"] or 0)
+    profit_delta = round(current_profit - previous_profit, 2)
+    order_delta = current_orders - previous_orders
+    avg_delta = round(current_avg - previous_avg, 2)
+
+    volume_effect = round(order_delta * previous_avg, 2)
+    unit_effect = round(current_orders * avg_delta, 2)
+    summary.update(
+        {
+            "profit_delta": profit_delta,
+            "profit_change_pct": _change_pct(current_profit, previous_profit),
+            "order_delta": order_delta,
+            "order_change_pct": _change_pct(current_orders, previous_orders),
+            "avg_profit_delta": avg_delta,
+            "avg_profit_change_pct": _change_pct(current_avg, previous_avg),
+            "volume_effect": volume_effect,
+            "unit_effect": unit_effect,
+            "volume_effect_pct": round(volume_effect / profit_delta * 100, 2) if profit_delta else 0,
+            "unit_effect_pct": round(unit_effect / profit_delta * 100, 2) if profit_delta else 0,
+        }
+    )
+
+    contributions: Dict[str, List[Dict[str, Any]]] = {}
+    for key, dimension in GROWTH_DIMENSIONS.items():
+        expression = dimension["expression"]
+        contributions[key] = _rows(
+            db.execute(
+                text(
+                    f"""
+                    SELECT
+                        {expression} AS name,
+                        SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
+                        SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
+                        ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0), 2) AS current_profit,
+                        ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0), 2) AS previous_profit,
+                        ROUND(
+                            COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0)
+                            - COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0),
+                            2
+                        ) AS delta_profit
+                    FROM t_performance_statement
+                    WHERE (shipping_date >= :current_start AND shipping_date < :current_end)
+                       OR (shipping_date >= :previous_start AND shipping_date < :previous_end)
+                    GROUP BY name
+                    ORDER BY ABS(delta_profit) DESC
+                    LIMIT 12
+                    """
+                ),
+                params,
+            ).mappings()
+        )
+        for item in contributions[key]:
+            item["order_delta"] = int(item["current_orders"] or 0) - int(item["previous_orders"] or 0)
+
+    customer_segments = _rows(
+        db.execute(
+            text(
+                """
+                WITH customer_by_code AS (
+                    SELECT shipping_code, MAX(TRIM(shipping_customer)) AS customer
+                    FROM t_consignment_trade
+                    WHERE NULLIF(shipping_code, '') IS NOT NULL
+                      AND NULLIF(TRIM(shipping_customer), '') IS NOT NULL
+                    GROUP BY shipping_code
+                    HAVING COUNT(DISTINCT TRIM(shipping_customer)) = 1
+                ), customer_activity AS (
+                    SELECT
+                        customer_by_code.customer,
+                        MIN(performance.shipping_date) AS first_shipping_date,
+                        SUM(CASE WHEN performance.shipping_date >= :current_start AND performance.shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
+                        SUM(CASE WHEN performance.shipping_date >= :previous_start AND performance.shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
+                        COALESCE(SUM(CASE WHEN performance.shipping_date >= :current_start AND performance.shipping_date < :current_end THEN performance.actual_performance ELSE 0 END), 0) AS current_profit,
+                        COALESCE(SUM(CASE WHEN performance.shipping_date >= :previous_start AND performance.shipping_date < :previous_end THEN performance.actual_performance ELSE 0 END), 0) AS previous_profit
+                    FROM t_performance_statement performance
+                    JOIN customer_by_code ON customer_by_code.shipping_code = performance.shipping_no
+                    GROUP BY customer_by_code.customer
+                ), labeled AS (
+                    SELECT
+                        CASE
+                            WHEN current_orders > 0 AND first_shipping_date >= :current_start THEN 'new'
+                            WHEN current_orders > 0 AND previous_orders = 0 THEN 'reactivated'
+                            WHEN current_orders > 0 AND previous_orders > 0 THEN 'retained'
+                            WHEN current_orders = 0 AND previous_orders > 0 THEN 'lost'
+                        END AS segment,
+                        current_orders,
+                        previous_orders,
+                        current_profit,
+                        previous_profit
+                    FROM customer_activity
+                    WHERE current_orders > 0 OR previous_orders > 0
+                )
+                SELECT
+                    segment AS name,
+                    COUNT(*) AS customer_count,
+                    SUM(current_orders) AS current_orders,
+                    SUM(previous_orders) AS previous_orders,
+                    ROUND(SUM(current_profit), 2) AS current_profit,
+                    ROUND(SUM(previous_profit), 2) AS previous_profit,
+                    ROUND(SUM(current_profit) - SUM(previous_profit), 2) AS delta_profit,
+                    SUM(CASE WHEN current_profit > previous_profit THEN 1 ELSE 0 END) AS growing_customers
+                FROM labeled
+                WHERE segment IS NOT NULL
+                GROUP BY segment
+                """
+            ),
+            params,
+        ).mappings()
+    )
+
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {
+            "month": month,
+            "compare_month": comparison_month,
+            "summary": summary,
+            "contributions": contributions,
+            "customer_segments": customer_segments,
+        },
+    }
+
+
+@router.get("/growth/detail", summary="增长贡献明细")
+def get_growth_detail(
+    month: str = Query(..., pattern=r"^\d{4}-\d{2}$"),
+    compare_month: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    dimension: Literal["products", "channels", "weights", "salesmen"] = "products",
+    keyword: Optional[str] = Query(None, max_length=100),
+    sort_by: Literal["impact", "delta_profit", "current_profit", "order_delta", "current_orders", "name"] = "impact",
+    sort_order: Literal["asc", "desc"] = "desc",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db),
+    auth_payload: dict = Depends(super_admin_required),
+):
+    current_start, current_end = _month_bounds(month)
+    comparison_month = compare_month or _previous_month(current_start)
+    previous_start, previous_end = _month_bounds(comparison_month)
+    if comparison_month == month:
+        raise HTTPException(422, "对比月份不能与目标月份相同")
+
+    dimension_config = GROWTH_DIMENSIONS[dimension]
+    expression = dimension_config["expression"]
+    grouped_sql = f"""
+        SELECT
+            {expression} AS name,
+            SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
+            SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
+            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN shipping_fee ELSE 0 END), 0), 2) AS current_revenue,
+            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN shipping_fee ELSE 0 END), 0), 2) AS previous_revenue,
+            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0), 2) AS current_profit,
+            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0), 2) AS previous_profit,
+            ROUND(
+                COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0)
+                - COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0),
+                2
+            ) AS delta_profit,
+            SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END)
+                - SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS order_delta
+        FROM t_performance_statement
+        WHERE (shipping_date >= :current_start AND shipping_date < :current_end)
+           OR (shipping_date >= :previous_start AND shipping_date < :previous_end)
+        GROUP BY name
+    """
+    params = {
+        "current_start": current_start,
+        "current_end": current_end,
+        "previous_start": previous_start,
+        "previous_end": previous_end,
+        "keyword": f"%{keyword.strip()}%" if keyword and keyword.strip() else None,
+        "limit": page_size,
+        "offset": (page - 1) * page_size,
+    }
+    total = int(
+        db.execute(
+            text(
+                f"""
+                SELECT COUNT(*)
+                FROM ({grouped_sql}) grouped_rows
+                WHERE (:keyword IS NULL OR name LIKE :keyword)
+                """
+            ),
+            params,
+        ).scalar()
+        or 0
+    )
+
+    order_expressions = {
+        "impact": "ABS(delta_profit)",
+        "delta_profit": "delta_profit",
+        "current_profit": "current_profit",
+        "order_delta": "order_delta",
+        "current_orders": "current_orders",
+        "name": "name",
+    }
+    order_expression = order_expressions[sort_by]
+    direction = "ASC" if sort_order == "asc" else "DESC"
+    items = _rows(
+        db.execute(
+            text(
+                f"""
+                SELECT *
+                FROM ({grouped_sql}) grouped_rows
+                WHERE (:keyword IS NULL OR name LIKE :keyword)
+                ORDER BY {order_expression} {direction}, name ASC
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            params,
+        ).mappings()
+    )
+
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {
+            "month": month,
+            "compare_month": comparison_month,
+            "dimension": dimension,
+            "dimension_label": dimension_config["label"],
+            "sort_by": sort_by,
+            "sort_order": sort_order,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "items": items,
         },
     }

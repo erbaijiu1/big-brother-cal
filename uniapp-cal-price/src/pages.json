@@ -56,6 +56,10 @@
         {
           "path": "business_stats/index",
           "style": { "navigationBarTitleText": "经营统计" }
+        },
+        {
+          "path": "business_stats/detail",
+          "style": { "navigationBarTitleText": "增长贡献明细" }
         }
       ]
     }

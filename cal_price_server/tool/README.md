@@ -99,3 +99,24 @@ docker exec \
 自动分页默认每页请求 50 条，单次请求超时 30 秒；网络超时、HTTP 429 或服务端错误会自动重试 3 次。
 可通过 `PAGE_ROWS`、`REQUEST_TIMEOUT_SECONDS`、`REQUEST_MAX_RETRIES` 和
 `REQUEST_RETRY_INTERVAL_SECONDS` 调整。修改 `PAGE_ROWS` 后应从第 1 页重新抓取，不能沿用旧页大小生成的页码断点。
+
+```angular2html
+docker exec \
+  -e PHPSESSID='2e2582e75253004f60151004a5a90ead' \
+  -e LEGACY_VERIFY_TLS=0 \
+  -e DATASET_TYPE=performance \
+  -e DRY_RUN=0 \
+  -e EXPORT_CSV=0 \
+  -e ENABLE_AUTO_PAGING=1 \
+  -e AUTO_MAX_PAGES=0 \
+  -e AUTO_RESUME=0 \
+  -e START_PAGE=1 \
+  -e PAGE_ROWS=50 \
+  -e REQUEST_TIMEOUT_SECONDS=30 \
+  -e REQUEST_MAX_RETRIES=3 \
+  -e REQUEST_RETRY_INTERVAL_SECONDS=1.5 \
+  -e AUTO_INTERVAL_SECONDS=0.2 \
+  cal_price_server \
+  python tool/get_all_trade_info.py
+```
+DATASET_TYPE =performance | consignment
