@@ -52,6 +52,10 @@
         {
           "path": "region_rule/index",
           "style": { "navigationBarTitleText": "区域计费规则" }
+        },
+        {
+          "path": "business_stats/index",
+          "style": { "navigationBarTitleText": "经营统计" }
         }
       ]
     }

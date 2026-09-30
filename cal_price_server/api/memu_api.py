@@ -19,6 +19,8 @@ BASE_MENUS: Dict[str, MenuItem] = {
                          path="/pages/admin/user_mgr/index",     order=50, permission_less=100),
     "cost":     MenuItem(title="渠道成本价查询", desc="渠道成本价查询",
                          path="/pages/admin/pricing_cal/index",  order=60, permission_less=1),
+    "business_stats": MenuItem(title="经营统计", desc="订单、利润、客户与渠道分析",
+                               path="/pages/admin/business_stats/index", order=70, permission_less=100),
 }
 
 

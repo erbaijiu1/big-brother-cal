@@ -18,21 +18,34 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from db.sqlalchemy_define import get_session_factory
 
-requests.packages.urllib3.disable_warnings()
 
-
-# 目标 URL
-URL = "http://101.33.221.7/SOA/WorkSpace.phtml"
+# 旧系统连接信息。会话 Cookie 必须由运行环境注入，避免凭证进入代码仓库。
+LEGACY_SYSTEM_BASE_URL = os.getenv(
+    "LEGACY_SYSTEM_BASE_URL",
+    "https://gzjsjy.s1.office7x.cn",
+).strip().rstrip("/")
+URL = os.getenv(
+    "LEGACY_SYSTEM_URL",
+    f"{LEGACY_SYSTEM_BASE_URL}/SOA/WorkSpace.phtml",
+).strip()
+PHPSESSID = os.getenv("PHPSESSID", "").strip()
+LEGACY_DS_CODE = os.getenv("LEGACY_DS_CODE", "").strip()
+LEGACY_GROUP_ID = os.getenv("LEGACY_GROUP_ID")
+VERIFY_TLS = os.getenv("LEGACY_VERIFY_TLS", "1") == "1"
 
 DATASET_CONFIG = {
     "consignment": {
         "data_file": "Apps/Custom_logisticsAccountingPublicitySystem/ConsignmentBooking",
-        "referer": "http://101.33.221.7/Apps/Custom_logisticsAccountingPublicitySystem/ConsignmentBooking_index.phtml",
+        "referer": f"{LEGACY_SYSTEM_BASE_URL}/Apps/Custom_logisticsAccountingPublicitySystem/ConsignmentBooking_index.phtml",
+        "ds_code": "T0020142",
+        "group_id": "",
         "checkpoint": "trade_ingest_checkpoint.json",
     },
     "performance": {
         "data_file": "Apps/Custom_logisticsAccountingPublicitySystem/PerformanceStatement",
-        "referer": "http://101.33.221.7/Apps/Custom_logisticsAccountingPublicitySystem/PerformanceStatement_index.phtml",
+        "referer": f"{LEGACY_SYSTEM_BASE_URL}/Apps/Custom_logisticsAccountingPublicitySystem/PerformanceStatement_index.phtml",
+        "ds_code": "T00200DE",
+        "group_id": "-1:0",
         "checkpoint": "performance_ingest_checkpoint.json",
     },
 }
@@ -41,22 +54,19 @@ DATASET_TYPE = os.getenv("DATASET_TYPE", "consignment").strip().lower()
 if DATASET_TYPE not in DATASET_CONFIG:
     DATASET_TYPE = "consignment"
 
-# 设置请求头 (根据你的 curl 复制)
+# 浏览器相关的 Sec-Fetch 和 sec-ch-ua 不是接口业务参数，这里只保留必要请求头。
 HEADERS = {
-    'Accept': '*/*',
-    'Accept-Language': 'zh-CN,zh;q=0.9',
-    'Cache-Control': 'no-cache',
-    'Content-Type': 'application/json',
-    'Origin': 'http://101.33.221.7',
-    'Pragma': 'no-cache',
-    'Proxy-Connection': 'keep-alive',
-    'Referer': 'http://101.33.221.7/Apps/Custom_logisticsAccountingPublicitySystem/ConsignmentBooking_index.phtml',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
-}
-
-# 设置 Cookie
-COOKIES = {
-    'PHPSESSID': 'bce6bc850df8ab11dadca2d1944f6f2a'
+    "Accept": "*/*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+    "Connection": "keep-alive",
+    "Content-Type": "application/json",
+    "Origin": LEGACY_SYSTEM_BASE_URL,
+    "Referer": DATASET_CONFIG[DATASET_TYPE]["referer"],
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 "
+        "Safari/537.36 Edg/151.0.0.0"
+    ),
 }
 
 # 基础数据模板
@@ -64,14 +74,20 @@ BASE_DATA = {
     "OPtion": "",
     "DataFile": "Apps/Custom_logisticsAccountingPublicitySystem/ConsignmentBooking",
     "Action": "Ow==",
+    "dsCode": LEGACY_DS_CODE or DATASET_CONFIG[DATASET_TYPE]["ds_code"],
     "IDList": [],
-    "Search": {},
+    # 旧系统接口字段本身拼写为 Serch，必须与浏览器请求保持一致。
+    "Serch": {},
     "DispStyle": "datagrid",
     "SortType": [],
     "filterData": [],
-    "PageRows": 15,
+    "PageRows": max(1, int(os.getenv("PAGE_ROWS", "50"))),
     "PageNo": 1,  # 初始页码
-    "GroupID": "",
+    "GroupID": (
+        LEGACY_GROUP_ID.strip()
+        if LEGACY_GROUP_ID is not None
+        else DATASET_CONFIG[DATASET_TYPE]["group_id"]
+    ),
     "ShortGID": "",
     "SubGroupData": 0
 }
@@ -82,7 +98,17 @@ ENABLE_AUTO_PAGING = os.getenv("ENABLE_AUTO_PAGING", "0") == "1"
 AUTO_MAX_PAGES = int(os.getenv("AUTO_MAX_PAGES", "0"))  # 0 表示不限制
 AUTO_RESUME = os.getenv("AUTO_RESUME", "1") == "1"
 AUTO_INTERVAL_SECONDS = float(os.getenv("AUTO_INTERVAL_SECONDS", "0.2"))
-CHECKPOINT_FILE = Path(__file__).resolve().parent / DATASET_CONFIG[DATASET_TYPE]["checkpoint"]
+REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "30"))
+REQUEST_MAX_RETRIES = max(0, int(os.getenv("REQUEST_MAX_RETRIES", "3")))
+REQUEST_RETRY_INTERVAL_SECONDS = float(os.getenv("REQUEST_RETRY_INTERVAL_SECONDS", "1.5"))
+START_PAGE = max(1, int(os.getenv("START_PAGE", "1")))
+DRY_RUN = os.getenv("DRY_RUN", "1") == "1"
+EXPORT_CSV = os.getenv("EXPORT_CSV", "1" if DRY_RUN else "0") == "1"
+PRINT_RESPONSE = os.getenv("PRINT_RESPONSE", "0") == "1"
+OUTPUT_DIR = Path(
+    os.getenv("INGEST_OUTPUT_DIR", str(Path(__file__).resolve().parent / "output"))
+).expanduser()
+CHECKPOINT_FILE = OUTPUT_DIR / DATASET_CONFIG[DATASET_TYPE]["checkpoint"]
 
 
 def build_payload(page_num):
@@ -198,12 +224,23 @@ def extract_csv_dataset(parsed_json):
 
 def write_csv(file_path, headers, rows):
     """写入 CSV 文件，返回写入的行数"""
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, "w", newline="", encoding="utf-8-sig") as csv_file:
         writer = csv.writer(csv_file)
         if headers:
             writer.writerow(headers)
         writer.writerows(rows)
     return len(rows)
+
+
+def export_page_csv(parsed_json):
+    """把当前页原始表格导出为 CSV，便于入库前人工检查。"""
+    headers, rows = extract_csv_dataset(parsed_json)
+    if not headers:
+        return None, 0
+    page_no = parsed_json.get("PageNo", 1)
+    csv_path = OUTPUT_DIR / f"{DATASET_TYPE}_page_{page_no}.csv"
+    return csv_path, write_csv(csv_path, headers, rows)
 
 
 def extract_trade_records(parsed_json):
@@ -586,7 +623,8 @@ def save_performance_records_to_db(records):
         session.close()
 
 
-def load_checkpoint(checkpoint_file=CHECKPOINT_FILE):
+def load_checkpoint(checkpoint_file=None):
+    checkpoint_file = checkpoint_file or CHECKPOINT_FILE
     if not checkpoint_file.exists():
         return None
     try:
@@ -599,7 +637,9 @@ def load_checkpoint(checkpoint_file=CHECKPOINT_FILE):
     return None
 
 
-def save_checkpoint(page_no, total_pages=None, checkpoint_file=CHECKPOINT_FILE):
+def save_checkpoint(page_no, total_pages=None, checkpoint_file=None):
+    checkpoint_file = checkpoint_file or CHECKPOINT_FILE
+    checkpoint_file.parent.mkdir(parents=True, exist_ok=True)
     data = {
         "last_success_page": page_no,
         "total_pages": total_pages,
@@ -609,18 +649,27 @@ def save_checkpoint(page_no, total_pages=None, checkpoint_file=CHECKPOINT_FILE):
         json.dump(data, file_obj, ensure_ascii=False, indent=2)
 
 
-def clear_checkpoint(checkpoint_file=CHECKPOINT_FILE):
+def clear_checkpoint(checkpoint_file=None):
+    checkpoint_file = checkpoint_file or CHECKPOINT_FILE
     if checkpoint_file.exists():
         checkpoint_file.unlink()
 
 
 def run_paginated_ingest(start_page=1, max_pages=0, resume=True):
-    """自动翻页入库，支持断点续跑"""
-    checkpoint = load_checkpoint() if resume else None
+    """自动翻页抓取，并按运行模式预览或入库。"""
+    # 预览不能推进正式入库断点，否则切换 DRY_RUN=0 后会跳过已预览的页面。
+    checkpoint = load_checkpoint() if resume and not DRY_RUN else None
     if checkpoint and isinstance(checkpoint.get("last_success_page"), int):
         start_page = max(start_page, checkpoint["last_success_page"] + 1)
 
-    print(f"自动翻页入库启动，起始页: {start_page}，最大页数限制: {max_pages or '不限制'}")
+    if DRY_RUN:
+        mode = "预览并导出 CSV" if EXPORT_CSV else "只预览，不入库"
+    else:
+        mode = "入库并导出 CSV" if EXPORT_CSV else "只入库，不导出 CSV"
+    print(
+        f"自动翻页启动，数据集: {DATASET_TYPE}，模式: {mode}，"
+        f"起始页: {start_page}，最大页数限制: {max_pages or '不限制'}"
+    )
     page_no = start_page
     processed_pages = 0
     total_saved = 0
@@ -642,11 +691,25 @@ def run_paginated_ingest(start_page=1, max_pages=0, resume=True):
             print(f"第 {page_no} 页解析失败（非 JSON 对象），停止自动翻页。")
             break
 
-        if DATASET_TYPE == "performance":
-            records = extract_performance_records(parsed_data)
+        headers, _ = extract_csv_dataset(parsed_data)
+        if not headers:
+            print(f"第 {page_no} 页没有可导出的表头，停止自动翻页。")
+            break
+
+        if EXPORT_CSV:
+            csv_path, csv_rows = export_page_csv(parsed_data)
+            print(f"第 {page_no} 页 CSV 已生成: {csv_path}（{csv_rows} 条）")
+
+        records = (
+            extract_performance_records(parsed_data)
+            if DATASET_TYPE == "performance"
+            else extract_trade_records(parsed_data)
+        )
+        if DRY_RUN:
+            saved_count = 0
+        elif DATASET_TYPE == "performance":
             saved_count = save_performance_records_to_db(records) if records else 0
         else:
-            records = extract_trade_records(parsed_data)
             saved_count = save_records_to_db(records) if records else 0
         total_saved += saved_count
 
@@ -654,18 +717,24 @@ def run_paginated_ingest(start_page=1, max_pages=0, resume=True):
         total_pages = parsed_data.get("Pages")
         data_list = parsed_data.get("DataList") or []
 
-        save_checkpoint(current_page, total_pages)
+        if not DRY_RUN:
+            save_checkpoint(current_page, total_pages)
         processed_pages += 1
-        print(f"第 {current_page} 页入库完成，写入/更新 {saved_count} 条。")
+        if DRY_RUN:
+            print(f"第 {current_page} 页检查完成，DRY_RUN 未写数据库。")
+        else:
+            print(f"第 {current_page} 页入库完成，写入/更新 {saved_count} 条。")
 
         if isinstance(total_pages, int) and current_page >= total_pages:
             print(f"已到最后一页（{current_page}/{total_pages}），自动翻页结束。")
-            clear_checkpoint()
+            if not DRY_RUN:
+                clear_checkpoint()
             break
 
         if not data_list:
             print(f"第 {current_page} 页无数据，自动翻页结束。")
-            clear_checkpoint()
+            if not DRY_RUN:
+                clear_checkpoint()
             break
 
         page_no = current_page + 1
@@ -676,38 +745,66 @@ def run_paginated_ingest(start_page=1, max_pages=0, resume=True):
 
 
 def fetch_page(page_num=1):
+    if not PHPSESSID:
+        raise RuntimeError("缺少 PHPSESSID 环境变量，请先从旧系统登录会话中取得 Cookie。")
+
     payload = build_payload(page_num)
     headers = HEADERS.copy()
     headers["Referer"] = DATASET_CONFIG[DATASET_TYPE]["referer"]
 
-    try:
-        response = requests.post(
-            URL,
-            headers=headers,
-            cookies=COOKIES,
-            data=payload,
-            verify=False,
-            timeout=15,
-        )
+    total_attempts = REQUEST_MAX_RETRIES + 1
+    for attempt in range(1, total_attempts + 1):
+        try:
+            response = requests.post(
+                URL,
+                headers=headers,
+                cookies={"PHPSESSID": PHPSESSID},
+                data=payload,
+                verify=VERIFY_TLS,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
 
-        print(f"第 {page_num} 页响应状态码: {response.status_code}")
-        if response.status_code == 200:
-            return response.text
+            print(f"第 {page_num} 页响应状态码: {response.status_code}")
+            if response.status_code == 200:
+                return response.text
 
-        print(f"第 {page_num} 页请求失败，状态码: {response.status_code}")
-        return None
-    except requests.RequestException as e:
-        print(f"请求发生异常: {e}")
-        return None
+            retryable = response.status_code == 429 or response.status_code >= 500
+            if not retryable or attempt >= total_attempts:
+                print(f"第 {page_num} 页请求失败，状态码: {response.status_code}")
+                return None
+            print(f"第 {page_num} 页请求失败，{REQUEST_RETRY_INTERVAL_SECONDS} 秒后重试（{attempt}/{REQUEST_MAX_RETRIES}）。")
+        except requests.RequestException as exc:
+            if attempt >= total_attempts:
+                print(f"请求发生异常，已达到最大重试次数: {exc}")
+                return None
+            print(f"请求发生异常: {exc}，{REQUEST_RETRY_INTERVAL_SECONDS} 秒后重试（{attempt}/{REQUEST_MAX_RETRIES}）。")
+
+        if REQUEST_RETRY_INTERVAL_SECONDS > 0:
+            time.sleep(REQUEST_RETRY_INTERVAL_SECONDS)
+
+    return None
 
 
 def main():
-    if ENABLE_AUTO_PAGING:
-        run_paginated_ingest(start_page=1, max_pages=AUTO_MAX_PAGES, resume=AUTO_RESUME)
+    if not PHPSESSID:
+        print("缺少 PHPSESSID 环境变量，请先从旧系统登录会话中取得 Cookie。")
         return
 
-    page_num = 1
+    if ENABLE_AUTO_PAGING:
+        run_paginated_ingest(
+            start_page=START_PAGE,
+            max_pages=AUTO_MAX_PAGES,
+            resume=AUTO_RESUME,
+        )
+        return
+
+    page_num = START_PAGE
+    if DRY_RUN:
+        mode = "预览并导出 CSV" if EXPORT_CSV else "只预览，不入库"
+    else:
+        mode = "入库并导出 CSV" if EXPORT_CSV else "只入库，不导出 CSV"
     print(f"当前数据集: {DATASET_TYPE} ({BASE_DATA.get('DataFile')})")
+    print(f"运行模式: {mode}")
     print(f"开始请求第 {page_num} 页...")
 
     result = fetch_page(page_num)
@@ -715,33 +812,37 @@ def main():
         print("没有获取到结果，请检查 Cookie、网络或请求参数。")
         return
 
-    print("===== 格式化结果开始 =====")
-    format_result = format_response(result)
-    print(format_result)
-    print("===== 格式化结果结束 =====")
+    if PRINT_RESPONSE:
+        print("===== 格式化结果开始 =====")
+        print(format_response(result))
+        print("===== 格式化结果结束 =====")
 
     parsed_data, warning = decode_json_str_response(result)
     if warning:
         print(f"解析提示: {warning}")
     if not isinstance(parsed_data, dict):
-        print("解码结果不是 JSON 对象，无法导出 CSV。")
+        print("解码结果不是 JSON 对象，无法继续处理。")
         return
 
-    records = []
-    if DATASET_TYPE == "performance":
-        records = extract_performance_records(parsed_data)
-    else:
-        headers, rows = extract_csv_dataset(parsed_data)
-        if not headers:
-            print("未找到可用表头，CSV 未生成。")
-            return
+    headers, _ = extract_csv_dataset(parsed_data)
+    if not headers:
+        print("未找到可用表头，无法继续处理。")
+        return
 
-        page_no = parsed_data.get("PageNo", page_num)
-        csv_path = Path(__file__).resolve().parent / f"trade_info_page_{page_no}.csv"
-        row_count = write_csv(csv_path, headers, rows)
+    if EXPORT_CSV:
+        csv_path, row_count = export_page_csv(parsed_data)
         print(f"CSV 已生成: {csv_path}")
         print(f"CSV 数据行数: {row_count}")
-        records = extract_trade_records(parsed_data)
+
+    records = (
+        extract_performance_records(parsed_data)
+        if DATASET_TYPE == "performance"
+        else extract_trade_records(parsed_data)
+    )
+
+    if DRY_RUN:
+        print(f"DRY_RUN 检查完成：解析 {len(records)} 条，数据库未写入。")
+        return
 
     try:
         if DATASET_TYPE == "performance":

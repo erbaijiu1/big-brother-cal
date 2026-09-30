@@ -18,6 +18,7 @@ services:
       CUSTOMER_QUOTE_SERVICE_TOKEN: ${CUSTOMER_QUOTE_SERVICE_TOKEN}
     volumes:
       - ../../server_data/cal_price_server/logs:/app/logs
+      - ./cal_price_server/tool/output:/app/tool/output
     healthcheck:
       test:
         - CMD
