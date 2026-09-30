@@ -9,7 +9,7 @@ from utils.logger_config import logger
 Base = declarative_base()
 
 
-from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float, Boolean
+from sqlalchemy import Column, String, Text, DateTime, text, Integer, Index, Float, Boolean, ForeignKey
 
 
 class GoodsClassification(Base):
@@ -26,6 +26,48 @@ class GoodsClassification(Base):
     last_modified = Column(DateTime, server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))  # 最后修改时间
     status = Column(Integer, default=0, comment='状态, 0:init, 1:ok')
     priority = Column(Integer, default=99, comment='优先级')
+    customer_price_tiers = Column(Text, nullable=True, default='', comment='对客阶梯价 JSON')
+    price_tiers_updated_at = Column(DateTime, nullable=True, server_default=text("CURRENT_TIMESTAMP"), comment='对客阶梯价更新时间')
+    warehouse_acceptance_policy = Column(String(20), nullable=False, default='MANUAL_CONFIRM', comment='入仓策略')
+    acceptance_notice = Column(String(255), nullable=True, default='', comment='入仓策略说明')
+
+
+class GoodsPriceTierHistory(Base):
+    __tablename__ = 't_goods_price_tier_history'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键ID')
+    category_id = Column(Integer, nullable=False, index=True, comment='货物分类ID')
+    main_category = Column(String(50), nullable=False, comment='分类名称快照')
+    config_snapshot = Column(Text, nullable=False, comment='对客阶梯价配置快照 JSON')
+    changed_by_id = Column(Integer, nullable=True, comment='操作管理员ID')
+    changed_by_name = Column(String(50), nullable=True, comment='操作管理员账号')
+    changed_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment='变更时间')
+
+
+class CooperationQuoteConfig(Base):
+    """长期合作客户的品类报价卡，与单票计价规则完全隔离。"""
+
+    __tablename__ = 't_cooperation_quote_config'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment='主键ID')
+    category_id = Column(Integer, nullable=False, unique=True, index=True, comment='货物分类ID')
+    enabled = Column(Boolean, nullable=False, default=True, comment='是否启用')
+    currency = Column(String(10), nullable=False, default='CNY', comment='币种')
+    price_tiers = Column(Text, nullable=False, comment='合作阶梯价 JSON')
+    delivery_base_fee = Column(Float, nullable=True, comment='香港派送基础费用')
+    delivery_included_weight = Column(Float, nullable=True, comment='基础派送费包重 kg')
+    delivery_excess_rate = Column(Float, nullable=True, comment='超重派送费 元/kg')
+    sea_crossing_notice = Column(String(255), nullable=True, default='', comment='港岛过海说明')
+    upstairs_notice = Column(Text, nullable=True, default='', comment='上楼费用说明')
+    cutoff_text = Column(String(255), nullable=True, default='', comment='入仓截单说明')
+    eta_text = Column(String(255), nullable=True, default='', comment='运输时效说明')
+    customer_notice = Column(Text, nullable=True, default='', comment='其他对客说明')
+    config_updated_at = Column(
+        DateTime,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        comment='配置更新时间',
+    )
 
 
 
@@ -59,6 +101,9 @@ class ChannelConfig(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, comment="主键")
     channel_code = Column(String(20), nullable=False, default='', comment="渠道编码，如 普A")
     channel_name = Column(String(100), nullable=False, default='', comment="对应渠道名称，如 港利发")
+    receiving_address = Column(Text, nullable=True, default='', comment="渠道收货地址")
+    customer_quote_config = Column(Text, nullable=True, default='', comment="对客报价展示配置 JSON")
+    config_updated_at = Column(DateTime, nullable=True, server_default=text("CURRENT_TIMESTAMP"), comment="对客配置更新时间")
     surcharge_rules = Column(Text, nullable=True, default='', comment="附加费规则 JSON，结构包含 surcharges 列表")
     filter_rules = Column(Text, nullable=True, default='', comment="过滤规则 JSON，结构包含 filters 列表")
     # 新增一个备注字段
@@ -73,6 +118,18 @@ class ChannelConfig(Base):
 
     def __repr__(self):
         return f"<ChannelSurchargeConfig(channel_code='{self.channel_code}', channel_name='{self.channel_name}')>"
+
+
+class ChannelQuoteConfigHistory(Base):
+    __tablename__ = 't_channel_quote_config_history'
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="主键")
+    channel_id = Column(Integer, ForeignKey('t_channel_config.id'), nullable=False, index=True, comment="渠道ID")
+    channel_code = Column(String(20), nullable=False, comment="渠道编码快照")
+    config_snapshot = Column(Text, nullable=False, comment="对客报价配置快照 JSON")
+    changed_by_id = Column(Integer, nullable=True, comment="操作管理员ID")
+    changed_by_name = Column(String(50), nullable=True, comment="操作管理员账号")
+    changed_at = Column(DateTime, nullable=False, server_default=text("CURRENT_TIMESTAMP"), comment="变更时间")
 
 class AdminUser(Base):
     __tablename__ = "admin_user"

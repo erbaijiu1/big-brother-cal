@@ -3,12 +3,20 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Literal, Dict, Any, Set
 from pydantic import BaseModel, Field, root_validator, validator
 from pydantic import model_validator
+from datetime import datetime
 import json
 import time
 
 from api.login import jwt_auth
 from api_model.api_request import ChannelQuery
-from db.db_models import ChannelConfig, AreaCategory, AreaCategoryMap, District, SubDistrict
+from db.db_models import (
+    ChannelConfig,
+    ChannelQuoteConfigHistory,
+    AreaCategory,
+    AreaCategoryMap,
+    District,
+    SubDistrict,
+)
 from db.sqlalchemy_define import get_db
 
 router = APIRouter(prefix="/channel_mgr", tags=["渠道管理"], dependencies=[Depends(jwt_auth)] )
@@ -74,6 +82,40 @@ class SurchargeRule(BaseModel):
 
 class ChannelSurchargePayload(BaseModel):
     surcharges: List[SurchargeRule] = Field(default_factory=list)
+
+
+class CustomerQuoteConfig(BaseModel):
+    enabled: bool = True
+    cutoff_text: str = ""
+    eta_text: str = ""
+    delivery_scope: str = "香港地面交收"
+    primary_notice: str = "上楼或特殊派送条件需要重新核价"
+    customs_notice: str = ""
+    show_fee_breakdown: bool = True
+
+
+def _normalize_customer_quote_config(value: Any) -> Dict[str, Any]:
+    parsed = _json_loads_maybe(value)
+    if not isinstance(parsed, dict):
+        parsed = {}
+    return CustomerQuoteConfig.model_validate(parsed).model_dump()
+
+
+def _append_quote_config_history(
+    db: Session,
+    channel: ChannelConfig,
+    config: Dict[str, Any],
+    auth_payload: Dict[str, Any],
+) -> None:
+    db.add(
+        ChannelQuoteConfigHistory(
+            channel_id=channel.id,
+            channel_code=channel.channel_code,
+            config_snapshot=_json_dumps(config),
+            changed_by_id=auth_payload.get("uid"),
+            changed_by_name=auth_payload.get("sub"),
+        )
+    )
 
 
 # ==============================
@@ -163,6 +205,9 @@ def list_channel(query: ChannelQuery, db: Session = Depends(get_db)):
             "id": obj.id,
             "channel_code": obj.channel_code,
             "channel_name": obj.channel_name,
+            "receiving_address": obj.receiving_address or "",
+            "customer_quote_config": _normalize_customer_quote_config(obj.customer_quote_config),
+            "config_updated_at": obj.config_updated_at.isoformat() if obj.config_updated_at else None,
             "surcharge_rules": _json_loads_maybe(obj.surcharge_rules),  # ✅ 自动解析
             "filter_rules": _json_loads_maybe(obj.filter_rules),        # ✅ 自动解析
             "remark": obj.remark,
@@ -182,6 +227,9 @@ def get_channel(id: int, db: Session = Depends(get_db)):
         "id": obj.id,
         "channel_code": obj.channel_code,
         "channel_name": obj.channel_name,
+        "receiving_address": obj.receiving_address or "",
+        "customer_quote_config": _normalize_customer_quote_config(obj.customer_quote_config),
+        "config_updated_at": obj.config_updated_at.isoformat() if obj.config_updated_at else None,
         "surcharge_rules": _json_loads_maybe(obj.surcharge_rules),
         "filter_rules": _json_loads_maybe(obj.filter_rules),
         "remark": obj.remark,
@@ -190,33 +238,85 @@ def get_channel(id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/add", summary="新增渠道")
-def create_channel(data: dict, db: Session = Depends(get_db)):
+def create_channel(
+    data: dict,
+    db: Session = Depends(get_db),
+    auth_payload: dict = Depends(jwt_auth),
+):
+    customer_quote_config = _normalize_customer_quote_config(data.get("customer_quote_config"))
     obj = ChannelConfig(
         channel_code=data.get("channel_code"),
         channel_name=data.get("channel_name"),
+        receiving_address=(data.get("receiving_address") or "").strip(),
+        customer_quote_config=_json_dumps(customer_quote_config),
+        config_updated_at=datetime.utcnow(),
         surcharge_rules=_json_dumps(data.get("surcharge_rules")),
         filter_rules=_json_dumps(data.get("filter_rules")),
         remark=data.get("remark", "")
     )
     db.add(obj)
+    db.flush()
+    _append_quote_config_history(db, obj, customer_quote_config, auth_payload)
     db.commit()
     db.refresh(obj)
     return {"id": obj.id}
 
 
 @router.put("/{id}", summary="编辑渠道（基础字段+整块 JSON）")
-def update_channel(id: int, data: dict, db: Session = Depends(get_db)):
+def update_channel(
+    id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    auth_payload: dict = Depends(jwt_auth),
+):
     obj = db.query(ChannelConfig).filter(ChannelConfig.id == id).first()
     if not obj:
         raise HTTPException(404, "渠道不存在")
 
+    old_customer_quote_config = _normalize_customer_quote_config(obj.customer_quote_config)
+    new_customer_quote_config = _normalize_customer_quote_config(
+        data.get("customer_quote_config", old_customer_quote_config)
+    )
+
     obj.channel_code = data.get("channel_code")
     obj.channel_name = data.get("channel_name")
+    obj.receiving_address = (data.get("receiving_address") or "").strip()
+    obj.customer_quote_config = _json_dumps(new_customer_quote_config)
     obj.surcharge_rules = _json_dumps(data.get("surcharge_rules"))
     obj.filter_rules = _json_dumps(data.get("filter_rules"))
     obj.remark = data.get("remark", "")
+    if new_customer_quote_config != old_customer_quote_config:
+        obj.config_updated_at = datetime.utcnow()
+        _append_quote_config_history(db, obj, new_customer_quote_config, auth_payload)
     db.commit()
     return {"msg": "ok"}
+
+
+@router.get("/{id}/customer-quote-history", summary="查询渠道对客报价配置历史")
+def get_customer_quote_history(id: int, db: Session = Depends(get_db)):
+    channel = db.query(ChannelConfig).filter(ChannelConfig.id == id).first()
+    if not channel:
+        raise HTTPException(404, "渠道不存在")
+    rows = (
+        db.query(ChannelQuoteConfigHistory)
+        .filter(ChannelQuoteConfigHistory.channel_id == id)
+        .order_by(ChannelQuoteConfigHistory.id.desc())
+        .all()
+    )
+    return {
+        "data": [
+            {
+                "id": row.id,
+                "channel_id": row.channel_id,
+                "channel_code": row.channel_code,
+                "config_snapshot": _json_loads_maybe(row.config_snapshot),
+                "changed_by_id": row.changed_by_id,
+                "changed_by_name": row.changed_by_name,
+                "changed_at": row.changed_at.isoformat() if row.changed_at else None,
+            }
+            for row in rows
+        ]
+    }
 
 
 @router.delete("/{id}", summary="删除渠道")

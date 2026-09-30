@@ -422,7 +422,7 @@ async def get_pricing_for_web_comm(data):
                 total_price, channel_conf, fee_details = calculate_total_price(rule, weight, volume, quantity, extra_fee_data)
                 if total_price <= 0:
                     continue
-                if total_price < rule.min_consumption:
+                if rule.min_consumption is not None and total_price < rule.min_consumption:
                     total_price = rule.min_consumption
 
                 quote_list.append({

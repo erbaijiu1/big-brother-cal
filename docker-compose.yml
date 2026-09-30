@@ -1,42 +1,35 @@
-version: '3.9'
-
 services:
   cal_price_server:
+    image: cal-price-server:local
     build:
       context: ./cal_price_server
     container_name: cal_price_server
     restart: always
     expose:
-      - 8088
+      - "8088"
     env_file:
       - ./cal_price_server/docker_conf.env
-    depends_on:
-      - mysql
-
-  nginx:
-    image: nginx:alpine
-    container_name: nginx
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro      # 路径已变化
-      - ./dist:/usr/share/nginx/html:ro
-      - ./logs:/var/log/nginx                            # 日志挂载到本地 logs 目录
-    depends_on:
-      - cal_price_server
-    ports:
-      - "80:80"
-
-  mysql:
-    image: mysql:8.4
-    container_name: mysql
-    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: Gmcc@123 
-      MYSQL_DATABASE: db_prize_cal
-      MYSQL_USER: root
-      MYSQL_PASSWORD: Gmcc@123 
-      TZ: Asia/Shanghai
-    ports:
-      - "3306:3306"
+      DB_HOST: mysql_db
+      DB_PORT: 3306
+      DB_USER: ${CAL_PRICE_DB_USER:-root}
+      DB_PASSWORD: ${CAL_PRICE_DB_PASSWORD:-Gmcc@123}
+      DB_NAME: ${CAL_PRICE_DB_NAME:-db_prize_cal}
+      CUSTOMER_QUOTE_SERVICE_TOKEN: ${CUSTOMER_QUOTE_SERVICE_TOKEN}
     volumes:
-      - ../server_data/mysql:/var/lib/mysql
-
+      - ../../server_data/cal_price_server/logs:/app/logs
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    networks:
+      - web

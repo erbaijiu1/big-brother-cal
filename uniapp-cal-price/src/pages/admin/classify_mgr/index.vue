@@ -87,6 +87,78 @@
           <uni-forms-item name="priority" label="优先级">
             <uni-easyinput v-model="editDialog.form.priority" type="number" placeholder="数字越小优先级越高" />
           </uni-forms-item>
+          <uni-forms-item name="warehouse_acceptance_policy" label="入仓策略">
+            <uni-data-select
+              v-model="editDialog.form.warehouse_acceptance_policy"
+              :localdata="acceptancePolicyOptions"
+            />
+          </uni-forms-item>
+          <uni-forms-item name="acceptance_notice" label="策略说明">
+            <uni-easyinput
+              v-model="editDialog.form.acceptance_notice"
+              type="textarea"
+              placeholder="人工确认所需资料或拒收原因"
+            />
+          </uni-forms-item>
+          <view class="tier-editor">
+            <view class="tier-title">
+              <text>对客阶梯价（只填对客价格，不填成本）</text>
+              <button size="mini" type="primary" plain @click="addPriceTier">新增区间</button>
+            </view>
+            <view
+              v-for="(tier, index) in editDialog.form.customer_price_tiers"
+              :key="index"
+              class="tier-row"
+            >
+              <uni-easyinput v-model="tier.min_quantity" type="number" placeholder="起始kg" />
+              <text>至</text>
+              <uni-easyinput v-model="tier.max_quantity" type="number" placeholder="留空=以上" />
+              <uni-easyinput v-model="tier.min_price" type="digit" placeholder="最低元/kg" />
+              <text>至</text>
+              <uni-easyinput v-model="tier.max_price" type="digit" placeholder="最高元/kg" />
+              <button size="mini" type="warn" plain @click="removePriceTier(index)">删除</button>
+            </view>
+            <text v-if="!editDialog.form.customer_price_tiers.length" class="tier-empty">
+              未配置时，AI不会对客展示阶梯价。
+            </text>
+          </view>
+          <view v-if="editDialog.isEdit" class="tier-editor cooperation-editor">
+            <view class="tier-title">
+              <text>长期合作报价（独立于单票报价）</text>
+              <label class="switch-wrap">
+                <switch
+                  :checked="editDialog.form.cooperation_quote.enabled"
+                  @change="onCooperationEnabledChange"
+                />
+                <text class="switch-label">启用</text>
+              </label>
+            </view>
+            <view
+              v-for="(tier, index) in editDialog.form.cooperation_quote.price_tiers"
+              :key="index"
+              class="tier-row"
+            >
+              <uni-easyinput v-model="tier.min_quantity" type="number" placeholder="起始kg" />
+              <text>至</text>
+              <uni-easyinput v-model="tier.max_quantity" type="number" placeholder="留空=以上" />
+              <uni-easyinput v-model="tier.min_price" type="digit" placeholder="最低元/kg" />
+              <text>至</text>
+              <uni-easyinput v-model="tier.max_price" type="digit" placeholder="最高元/kg" />
+              <button size="mini" type="warn" plain @click="removeCooperationTier(index)">删除</button>
+            </view>
+            <button size="mini" type="primary" plain @click="addCooperationTier">新增合作价区间</button>
+            <view class="cooperation-fees">
+              <uni-easyinput v-model="editDialog.form.cooperation_quote.delivery_base_fee" type="digit" placeholder="香港派送基础费（元）" />
+              <uni-easyinput v-model="editDialog.form.cooperation_quote.delivery_included_weight" type="digit" placeholder="派送包重（kg）" />
+              <uni-easyinput v-model="editDialog.form.cooperation_quote.delivery_excess_rate" type="digit" placeholder="超重费（元/kg）" />
+            </view>
+            <uni-easyinput v-model="editDialog.form.cooperation_quote.sea_crossing_notice" placeholder="港岛过海说明" />
+            <uni-easyinput v-model="editDialog.form.cooperation_quote.upstairs_notice" type="textarea" placeholder="上楼费用说明" />
+            <uni-easyinput v-model="editDialog.form.cooperation_quote.cutoff_text" placeholder="截单/入仓时间" />
+            <uni-easyinput v-model="editDialog.form.cooperation_quote.eta_text" placeholder="运输及派送时效" />
+            <uni-easyinput v-model="editDialog.form.cooperation_quote.customer_notice" type="textarea" placeholder="其他对客备注" />
+            <text class="tier-empty">合作价单独保存，不会修改上面的单票阶梯价或精确计价规则。</text>
+          </view>
         </uni-forms>
         <view class="dialog-actions">
           <button @click="closeEditDialog">取消</button>
@@ -112,6 +184,27 @@ const query = reactive({
 })
 
 const searchFormRef = ref(null)
+const acceptancePolicyOptions = [
+  { value: 'AUTO_ACCEPT', text: '自动接收入仓' },
+  { value: 'MANUAL_CONFIRM', text: '人工确认后入仓' },
+  { value: 'REJECTED', text: '拒绝接收入仓' }
+]
+
+function emptyCooperationQuote() {
+  return {
+    enabled: false,
+    currency: 'CNY',
+    price_tiers: [],
+    delivery_base_fee: '',
+    delivery_included_weight: '',
+    delivery_excess_rate: '',
+    sea_crossing_notice: '',
+    upstairs_notice: '',
+    cutoff_text: '',
+    eta_text: '',
+    customer_notice: ''
+  }
+}
 
 // 编辑弹窗
 const editPopup = ref(null)
@@ -125,7 +218,11 @@ const editDialog = reactive({
     temperature_req: '',
     hazard_level: '',
     storage_level: '',
-    priority: 99
+    priority: 99,
+    customer_price_tiers: [],
+    warehouse_acceptance_policy: 'MANUAL_CONFIRM',
+    acceptance_notice: '',
+    cooperation_quote: emptyCooperationQuote()
   }
 })
 const editFormRef = ref(null)
@@ -174,7 +271,7 @@ function onIncludeDeletedChange(e) {
 }
 
 /** 编辑弹窗 */
-function showEditDialog(row = null) {
+async function showEditDialog(row = null) {
   if (row) {
     editDialog.isEdit = true
     editDialog.form = {
@@ -185,7 +282,11 @@ function showEditDialog(row = null) {
       temperature_req: row.temperature_req ?? '',
       hazard_level: row.hazard_level ?? '',
       storage_level: row.storage_level ?? '',
-      priority: typeof row.priority === 'number' ? row.priority : Number(row.priority) || 99
+      priority: typeof row.priority === 'number' ? row.priority : Number(row.priority) || 99,
+      customer_price_tiers: (row.customer_price_tiers || []).map(tier => ({ ...tier })),
+      warehouse_acceptance_policy: row.warehouse_acceptance_policy || 'MANUAL_CONFIRM',
+      acceptance_notice: row.acceptance_notice || '',
+      cooperation_quote: emptyCooperationQuote()
     }
   } else {
     editDialog.isEdit = false
@@ -197,14 +298,93 @@ function showEditDialog(row = null) {
       temperature_req: '',
       hazard_level: '',
       storage_level: '',
-      priority: 99
+      priority: 99,
+      customer_price_tiers: [],
+      warehouse_acceptance_policy: 'MANUAL_CONFIRM',
+      acceptance_notice: '',
+      cooperation_quote: emptyCooperationQuote()
     }
   }
   editPopup.value.open()
+  if (row) {
+    const cooperation = await request({
+      url: `/cal_price/classify_mgr/${row.category_id}/cooperation-quote`,
+      method: 'GET'
+    })
+    if (!cooperation?.error_code && cooperation?.category_id) {
+      editDialog.form.cooperation_quote = {
+        ...emptyCooperationQuote(),
+        ...cooperation,
+        price_tiers: (cooperation.price_tiers || []).map(tier => ({ ...tier }))
+      }
+    }
+  }
 }
 
 function closeEditDialog() {
   editPopup.value.close()
+}
+
+function addPriceTier() {
+  editDialog.form.customer_price_tiers.push({
+    min_quantity: 0,
+    max_quantity: '',
+    min_price: '',
+    max_price: '',
+    unit: 'kg'
+  })
+}
+
+function removePriceTier(index) {
+  editDialog.form.customer_price_tiers.splice(index, 1)
+}
+
+function onCooperationEnabledChange(e) {
+  editDialog.form.cooperation_quote.enabled = !!e.detail.value
+}
+
+function addCooperationTier() {
+  editDialog.form.cooperation_quote.price_tiers.push({
+    min_quantity: 0,
+    max_quantity: '',
+    min_price: '',
+    max_price: '',
+    unit: 'kg'
+  })
+}
+
+function removeCooperationTier(index) {
+  editDialog.form.cooperation_quote.price_tiers.splice(index, 1)
+}
+
+function normalizeTiers(tiers) {
+  return tiers.map(tier => ({
+    min_quantity: Number(tier.min_quantity || 0),
+    max_quantity: tier.max_quantity === '' || tier.max_quantity == null
+      ? null
+      : Number(tier.max_quantity),
+    min_price: Number(tier.min_price),
+    max_price: Number(tier.max_price),
+    unit: tier.unit || 'kg'
+  }))
+}
+
+function hasInvalidTier(tiers) {
+  return tiers.some(tier => {
+    const minQuantity = Number(tier.min_quantity || 0)
+    const maxQuantity = tier.max_quantity === '' || tier.max_quantity == null
+      ? null
+      : Number(tier.max_quantity)
+    const minPrice = Number(tier.min_price)
+    const maxPrice = Number(tier.max_price)
+    return !Number.isFinite(minQuantity)
+      || minQuantity < 0
+      || (maxQuantity !== null && (!Number.isFinite(maxQuantity) || maxQuantity <= minQuantity))
+      || !Number.isFinite(minPrice)
+      || !Number.isFinite(maxPrice)
+      || minPrice < 0
+      || maxPrice < minPrice
+  })
 }
 
 async function saveCategory() {
@@ -221,7 +401,42 @@ async function saveCategory() {
       : `/cal_price/classify_mgr/`
     const method = isEdit ? 'PUT' : 'POST'
 
-    await request({ url, method, data: editDialog.form })
+    if (hasInvalidTier(editDialog.form.customer_price_tiers)) {
+      uni.showToast({ title: '请检查阶梯区间和价格上下限', icon: 'none' })
+      return
+    }
+    const cooperation = editDialog.form.cooperation_quote
+    if (isEdit && cooperation.enabled && !cooperation.price_tiers.length) {
+      uni.showToast({ title: '启用合作报价前请添加价格区间', icon: 'none' })
+      return
+    }
+    if (isEdit && hasInvalidTier(cooperation.price_tiers)) {
+      uni.showToast({ title: '请检查合作报价区间和价格上下限', icon: 'none' })
+      return
+    }
+
+    const payload = {
+      ...editDialog.form,
+      customer_price_tiers: normalizeTiers(editDialog.form.customer_price_tiers)
+    }
+    delete payload.cooperation_quote
+    const categoryResult = await request({ url, method, data: payload })
+    if (categoryResult?.error_code) {
+      throw new Error(categoryResult.message || '分类保存失败')
+    }
+    if (isEdit && cooperation.price_tiers.length) {
+      const cooperationResult = await request({
+        url: `/cal_price/classify_mgr/${editDialog.form.category_id}/cooperation-quote`,
+        method: 'PUT',
+        data: {
+          ...cooperation,
+          price_tiers: normalizeTiers(cooperation.price_tiers)
+        }
+      })
+      if (cooperationResult?.error_code) {
+        throw new Error(cooperationResult.message || '合作报价保存失败')
+      }
+    }
     uni.showToast({ title: isEdit ? '保存成功' : '新增成功', icon: 'success' })
     closeEditDialog()
     fetchData()
@@ -333,11 +548,41 @@ onPullDownRefresh(() => {
   padding: 24rpx;
   border-radius: 12rpx;
   width: 700rpx;
+  max-height: 88vh;
+  overflow-y: auto;
 }
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 24rpx;
   margin-top: 18rpx;
+}
+.tier-editor {
+  margin-top: 16rpx;
+  padding: 18rpx;
+  border: 1px solid #e5e7eb;
+  border-radius: 10rpx;
+}
+.tier-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+  font-weight: 600;
+}
+.tier-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 10rpx;
+}
+.tier-empty { color: #909399; font-size: 24rpx; }
+.cooperation-editor .uni-easyinput { margin-bottom: 10rpx; }
+.cooperation-fees {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8rpx;
+  margin-top: 12rpx;
 }
 </style>
