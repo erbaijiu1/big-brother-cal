@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 TOOL_PATH = Path(__file__).resolve().parents[1] / "tool" / "get_all_trade_info.py"
@@ -155,3 +155,19 @@ class ImportTradeDataToolTest(unittest.TestCase):
 
         export_page_csv.assert_not_called()
         save_records.assert_called_once()
+
+    def test_performance_sync_keeps_existing_product_when_source_is_blank(self):
+        tool = load_tool(dataset_type="performance")
+        session = SimpleNamespace(
+            execute=Mock(),
+            commit=Mock(),
+            rollback=Mock(),
+            close=Mock(),
+        )
+
+        with patch.object(tool, "get_session_factory", return_value=lambda: session):
+            tool.save_performance_records_to_db([{"record_key": "one"}])
+
+        statement = str(session.execute.call_args.args[0])
+        self.assertIn("NULLIF(TRIM(VALUES(product_name)), '')", statement)
+        session.commit.assert_called_once()

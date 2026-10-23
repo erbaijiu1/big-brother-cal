@@ -600,7 +600,10 @@ def save_performance_records_to_db(records):
             salesman_payment_date = VALUES(salesman_payment_date),
             company_tracking_no = VALUES(company_tracking_no),
             ship_to = VALUES(ship_to),
-            product_name = VALUES(product_name),
+            product_name = COALESCE(
+                NULLIF(TRIM(VALUES(product_name)), ''),
+                product_name
+            ),
             goods_count = VALUES(goods_count),
             goods_weight = VALUES(goods_weight),
             goods_volume = VALUES(goods_volume),

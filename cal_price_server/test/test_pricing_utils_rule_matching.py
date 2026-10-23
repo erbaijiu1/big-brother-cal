@@ -144,5 +144,17 @@ class TestRegionRuleMatching(unittest.TestCase):
         
         self.assertEqual(u_rules, [])
 
+
+class TestCustomerProfit(unittest.TestCase):
+    def test_uses_minimum_profit_when_percentage_is_lower(self):
+        with patch.object(pricing_utils.config, 'MIN_EARN_MONEY', 30.0), \
+                patch.object(pricing_utils.config, 'EARN_MONEY_RATIO', 0.3):
+            self.assertEqual(pricing_utils.calculate_customer_profit(50.0), 30.0)
+
+    def test_uses_percentage_profit_when_it_is_higher(self):
+        with patch.object(pricing_utils.config, 'MIN_EARN_MONEY', 30.0), \
+                patch.object(pricing_utils.config, 'EARN_MONEY_RATIO', 0.3):
+            self.assertEqual(pricing_utils.calculate_customer_profit(200.0), 60.0)
+
 if __name__ == '__main__':
     unittest.main()

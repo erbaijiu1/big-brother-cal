@@ -13,10 +13,10 @@ DB_NAME = os.getenv("DB_NAME", "db_prize_cal")
 GLOBAL_LOG_PATH = os.getenv("GLOBAL_LOG_PATH", "./logs/server.log")
 
 
-# 至少挣多少钱
-MIN_EARN_MONEY = os.getenv("MIN_EARN_MONEY", 30)
-# 配置挣取的比例
-EARN_MONEY_RATIO = os.getenv("EARN_MONEY_RATIO", 0.3)
+# 最低利润额。对客利润取 max(最低利润额, 成本 * 利润率)。
+MIN_EARN_MONEY = float(os.getenv("MIN_EARN_MONEY", "30"))
+# 成本利润率，例如 0.3 表示成本的 30%。
+EARN_MONEY_RATIO = float(os.getenv("EARN_MONEY_RATIO", "0.3"))
 # 加额外费用的项
 EXTRA_FEE_ITEMS = os.getenv("EXTRA_FEE_ITEMS", "unit_price")
 

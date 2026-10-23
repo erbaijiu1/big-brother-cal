@@ -67,6 +67,11 @@ def calculate_range_fee(value: float, rules: List[Dict[str, Any]]):
     return 0.0, None
 
 
+def calculate_customer_profit(cost_amount: float) -> float:
+    """按“至少赚固定金额，否则按成本比例”计算对客利润。"""
+    return max(config.MIN_EARN_MONEY, cost_amount * config.EARN_MONEY_RATIO)
+
+
 def calculate_surcharge_with_breakdown(
     context: Dict[str, Any],
     surcharge_rules: Dict[str, List[Dict[str, Any]]]
@@ -171,7 +176,7 @@ def get_type_max_fee(price_rules: str, volume: float, weight: float, quantity: i
 
     # 增加我们要挣的钱
     if name in config.EXTRA_FEE_ITEMS and not extra_fee_data.get('is_inner', False):
-        earn_money = max(config.MIN_EARN_MONEY, unit_price * config.EARN_MONEY_RATIO)
+        earn_money = calculate_customer_profit(unit_price)
         unit_price = unit_price + earn_money
         logger.debug(f"earn_money: {earn_money}, unit_price: {unit_price}")
 

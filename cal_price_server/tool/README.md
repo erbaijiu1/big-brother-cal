@@ -120,3 +120,20 @@ docker exec \
   python tool/get_all_trade_info.py
 ```
 DATASET_TYPE =performance | consignment
+
+## 未知产品补全
+
+`product_name_enrichment.py` 用公司单号关联托运单，从原始货物描述补全经营分析中的空产品名。
+处理顺序为确定性关键词规则优先、可选大模型兜底；默认只生成预览 CSV，不更新数据库。
+
+同步脚本对产品名采用保护更新：旧系统返回非空品名时覆盖；旧系统返回空值时保留数据库中
+已有的人工或自动补全结果。
+
+只运行规则并生成预览：
+
+```bash
+python tool/product_name_enrichment.py --disable-llm
+```
+
+启用大模型时配置与 OpenAI 兼容的 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`。
+实际写回必须显式增加 `--apply`；执行前应先审阅预览文件并取得数据库变更授权。
