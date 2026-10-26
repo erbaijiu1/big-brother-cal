@@ -24,16 +24,20 @@ CSV 和断点文件默认保存在 `tool/output/`。Docker Compose 已将该目�
 | `LEGACY_GROUP_ID` | 按数据集选择 | 可选，覆盖当前数据集的分组编码 |
 | `LEGACY_VERIFY_TLS` | `1` | 是否校验 HTTPS 证书 |
 | `DATASET_TYPE` | `consignment` | `consignment` 或 `performance` |
+| `SYNC_ALL_DATASETS` | `0` | `1` 时依次同步托运单、绩效表，并在正式同步后补全产品分类 |
 | `DRY_RUN` | `1` | `1` 只导出，`0` 写数据库 |
 | `EXPORT_CSV` | 预览为 `1`，入库为 `0` | 是否导出每页 CSV，可显式覆盖 |
 | `START_PAGE` | `1` | 起始页 |
-| `PAGE_ROWS` | `14` | 每页条数，与当前网页请求一致 |
+| `PAGE_ROWS` | `50` | 每页条数，与当前网页请求一致 |
 | `ENABLE_AUTO_PAGING` | `0` | 是否连续翻页 |
 | `AUTO_MAX_PAGES` | `0` | 最大处理页数，`0` 不限制 |
 | `AUTO_RESUME` | `1` | 正式入库时是否从 checkpoint 继续 |
 | `AUTO_INTERVAL_SECONDS` | `0.2` | 页间等待秒数 |
 | `INGEST_OUTPUT_DIR` | `tool/output` | CSV 与 checkpoint 输出目录 |
 | `PRINT_RESPONSE` | `0` | 是否打印解码后的整页响应 |
+| `AUTO_ENRICH_PRODUCT_NAMES` | `1` | 正式同步绩效表后，是否自动补全空产品分类 |
+| `PRODUCT_ENRICH_DISABLE_LLM` | `0` | `1` 时补全阶段只使用版本化映射和确定性规则 |
+| `PRODUCT_ENRICH_LLM_BATCH_SIZE` | `30` | 大模型兜底每批唯一描述数 |
 
 数据库连接继续使用项目已有的 `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`。
 
@@ -74,7 +78,24 @@ AUTO_RESUME=1 \
 python tool/get_all_trade_info.py
 ```
 
-将 `DATASET_TYPE` 改成 `performance` 可导入业绩明细。
+将 `DATASET_TYPE` 改成 `performance` 可导入业绩明细。正式导入绩效表后，默认自动运行产品分类补全。
+
+### 4. 一条命令同步并补全产品分类
+
+先用 `DRY_RUN=1` 检查两套源数据（不会入库，也不会执行补全写入）：
+
+```bash
+PHPSESSID='<登录 Cookie>' \
+SYNC_ALL_DATASETS=1 \
+DRY_RUN=1 \
+ENABLE_AUTO_PAGING=1 \
+AUTO_MAX_PAGES=0 \
+AUTO_RESUME=0 \
+python tool/get_all_trade_info.py
+```
+
+确认后，将 `DRY_RUN` 改为 `0` 即可依次执行：托运单同步 → 绩效表同步 → 空产品分类补全。
+如果本次只希望使用已审核映射和规则，不调用模型，再增加 `PRODUCT_ENRICH_DISABLE_LLM=1`。
 
 工具会按数据集自动使用网页当前的请求参数：
 
@@ -124,10 +145,13 @@ DATASET_TYPE =performance | consignment
 ## 未知产品补全
 
 `product_name_enrichment.py` 用公司单号关联托运单，从原始货物描述补全经营分析中的空产品名。
-处理顺序为确定性关键词规则优先、可选大模型兜底；默认只生成预览 CSV，不更新数据库。
+统一分类入口为 `product_category_normalizer.py`，处理顺序为：八类标准名 → 已审核版本化映射
+`data/product_category_mapping_v1.csv` → 确定性关键词规则 → 可选大模型兜底。无法可靠识别的描述保持为空，
+不会默认归入普货。默认只生成预览 CSV，不更新数据库。
 
-同步脚本对产品名采用保护更新：旧系统返回非空品名时覆盖；旧系统返回空值时保留数据库中
-已有的人工或自动补全结果。
+同步脚本对产品名采用“只填空”保护更新：数据库已有分类始终保留；仅当已有字段为空时，
+才写入本次归一出的标准品类。旧系统原始品名继续保存在 `row_text_json` / `raw_row_json`，
+不会因为归一而丢失。这样后续反复同步也不会覆盖人工或自动补全结果。
 
 只运行规则并生成预览：
 

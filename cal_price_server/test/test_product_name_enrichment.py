@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -92,11 +93,78 @@ class ProductNameEnrichmentTest(unittest.TestCase):
         }
         classifier = self.tool.LlmProductClassifier("https://llm.example/v1", "secret", "test-model")
 
-        with patch.object(self.tool.requests, "post", return_value=response):
+        with patch.object(self.tool.requests, "post", return_value=response) as post_request:
             classified = classifier.classify(["冻海参", "模糊货物", "越界货物"])
 
         self.assertEqual(classified, {"冻海参": ("水产海鲜", 0.96)})
         response.raise_for_status.assert_called_once()
+        self.assertFalse(post_request.call_args.kwargs["json"]["enable_thinking"])
+
+    def test_reuses_successful_llm_results_from_preview(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            preview_path = Path(temp_dir) / "preview.csv"
+            preview_path.write_text(
+                "performance_id,description,product_name,source,confidence\n"
+                "1,枇杷,水果,llm,0.95\n"
+                "2,模糊货物,食品,llm,0.5\n"
+                "3,牛肉,生鲜肉类,rule,1.0\n",
+                encoding="utf-8-sig",
+            )
+
+            cached = self.tool.load_llm_results_from_preview(preview_path)
+
+        self.assertEqual(cached, {"枇杷": ("水果", 0.95)})
+        resolutions = self.tool.resolve_product_names(
+            [self.tool.ProductCandidate(7, "A", "枇杷")],
+            cached_llm_results=cached,
+        )
+        self.assertEqual([(item.performance_id, item.product_name) for item in resolutions], [(7, "水果")])
+
+    def test_approved_mapping_runs_before_model(self):
+        classifier = Mock()
+
+        resolutions = self.tool.resolve_product_names(
+            [self.tool.ProductCandidate(11, "A", "芒果")],
+            llm_classifier=classifier,
+        )
+
+        self.assertEqual(
+            [(item.product_name, item.source) for item in resolutions],
+            [("水果", "mapping")],
+        )
+        classifier.classify.assert_not_called()
+
+    def test_reusable_enrichment_rolls_back_preview_and_commits_apply(self):
+        preview_session = Mock()
+        apply_session = Mock()
+        candidate = self.tool.ProductCandidate(12, "A", "芒果")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "preview.csv"
+            with (
+                patch.object(self.tool, "get_session_factory", return_value=lambda: preview_session),
+                patch.object(self.tool, "load_blank_product_candidates", return_value=[candidate]),
+            ):
+                summary = self.tool.enrich_blank_product_names(
+                    disable_llm=True,
+                    output=output,
+                )
+            self.assertEqual(summary["resolved_count"], 1)
+            preview_session.rollback.assert_called_once()
+            preview_session.commit.assert_not_called()
+
+            with (
+                patch.object(self.tool, "get_session_factory", return_value=lambda: apply_session),
+                patch.object(self.tool, "load_blank_product_candidates", return_value=[candidate]),
+                patch.object(self.tool, "apply_product_resolutions", return_value=1),
+            ):
+                summary = self.tool.enrich_blank_product_names(
+                    apply=True,
+                    disable_llm=True,
+                    output=output,
+                )
+            self.assertEqual(summary["updated_count"], 1)
+            apply_session.commit.assert_called_once()
 
 
 

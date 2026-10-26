@@ -44,11 +44,16 @@
         <text class="record-count">{{ formatInteger(stats.summary.order_count) }} 票</text>
       </view>
 
+      <view v-if="Number(stats.summary.missing_cost_order_count) > 0" class="cost-warning">
+        <text class="cost-warning-title">{{ formatInteger(stats.summary.missing_cost_order_count) }} 票缺少托运成本</text>
+        <text>涉及运费 {{ money(stats.summary.missing_cost_shipping_fee) }}，已从毛利润和毛利率中排除。</text>
+      </view>
+
       <view class="metric-grid">
         <view class="metric-card metric-primary">
-          <text class="metric-label">总利润</text>
+          <text class="metric-label">总毛利润</text>
           <text class="metric-value">{{ money(stats.summary.total_profit) }}</text>
-          <text class="metric-foot">利润率 {{ percent(stats.summary.profit_rate_pct) }}</text>
+          <text class="metric-foot">毛利率 {{ percent(stats.summary.profit_rate_pct) }}</text>
         </view>
         <view class="metric-card">
           <text class="metric-label">总运费收入</text>
@@ -56,7 +61,7 @@
           <text class="metric-foot">成本 {{ money(stats.summary.total_shipping_cost) }}</text>
         </view>
         <view class="metric-card">
-          <text class="metric-label">平均单票利润</text>
+          <text class="metric-label">平均单票毛利润</text>
           <text class="metric-value">{{ money(stats.summary.avg_order_profit) }}</text>
           <text class="metric-foot">{{ formatInteger(stats.summary.trade_count) }} 条托运记录</text>
         </view>
@@ -73,7 +78,7 @@
             <text class="section-kicker">01 / TREND</text>
             <text class="section-title">月度经营走势</text>
           </view>
-          <text class="section-note">柱长代表月利润</text>
+          <text class="section-note">柱长代表月毛利润</text>
         </view>
         <scroll-view class="month-scroll" scroll-x>
           <view class="month-chart">
@@ -122,7 +127,7 @@
 
         <view class="growth-metrics">
           <view class="growth-metric">
-            <text class="growth-metric-label">利润变化</text>
+            <text class="growth-metric-label">毛利润变化</text>
             <text class="growth-metric-value" :class="signClass(growth.summary.profit_delta)">{{ signedMoney(growth.summary.profit_delta) }}</text>
             <text class="growth-metric-rate">{{ signedPercent(growth.summary.profit_change_pct) }}</text>
           </view>
@@ -132,7 +137,7 @@
             <text class="growth-metric-rate">{{ signedPercent(growth.summary.order_change_pct) }}</text>
           </view>
           <view class="growth-metric">
-            <text class="growth-metric-label">单票利润变化</text>
+            <text class="growth-metric-label">单票毛利润变化</text>
             <text class="growth-metric-value" :class="signClass(growth.summary.avg_profit_delta)">{{ signedMoney(growth.summary.avg_profit_delta) }}</text>
             <text class="growth-metric-rate">{{ signedPercent(growth.summary.avg_profit_change_pct) }}</text>
           </view>
@@ -140,8 +145,8 @@
 
         <view class="bridge-card">
           <view class="bridge-title-row">
-            <text class="bridge-title">利润增长桥</text>
-            <text class="bridge-caption">数量贡献 + 单票利润贡献 = 总变化</text>
+            <text class="bridge-title">毛利润增长桥</text>
+            <text class="bridge-caption">数量贡献 + 单票毛利润贡献 = 总变化</text>
           </view>
           <view class="bridge-flow">
             <view class="bridge-node base-node">
@@ -156,7 +161,7 @@
             </view>
             <view class="bridge-plus">+</view>
             <view class="bridge-node effect-node">
-              <text class="bridge-node-label">单票利润</text>
+              <text class="bridge-node-label">单票毛利润</text>
               <text class="bridge-node-value" :class="signClass(growth.summary.unit_effect)">{{ signedCompactMoney(growth.summary.unit_effect) }}</text>
               <text class="bridge-node-foot">贡献 {{ percent(growth.summary.unit_effect_pct) }}</text>
             </view>
@@ -247,7 +252,7 @@
             <text class="section-kicker">02 / PRODUCT</text>
             <text class="section-title">最赚钱的货</text>
           </view>
-          <text class="section-note">按总利润排序</text>
+          <text class="section-note">按总毛利润排序</text>
         </view>
         <view class="rank-list">
           <view v-for="(item, index) in stats.products" :key="item.name" class="rank-row">
@@ -263,7 +268,7 @@
               <view class="rank-meta">
                 <text>{{ item.order_count }} 票</text>
                 <text>单票 {{ money(item.avg_order_profit) }}</text>
-                <text>利润率 {{ percent(item.profit_rate_pct) }}</text>
+                <text>毛利率 {{ percent(item.profit_rate_pct) }}</text>
               </view>
             </view>
           </view>
@@ -287,7 +292,7 @@
               <view class="bar-track soft-track">
                 <view class="bar-fill ink" :style="{ width: `${Math.max(Number(item.order_pct) || 0, 1)}%` }"></view>
               </view>
-              <text class="distribution-detail">{{ item.order_count }} 票 · 利润 {{ money(item.total_profit) }}</text>
+              <text class="distribution-detail">{{ item.order_count }} 票 · 毛利润 {{ money(item.total_profit) }}</text>
             </view>
           </view>
         </view>
@@ -323,9 +328,9 @@
               <text class="cell cell-name">渠道</text>
               <text class="cell">票数</text>
               <text class="cell">收入</text>
-              <text class="cell">利润</text>
-              <text class="cell">单票利润</text>
-              <text class="cell">利润率</text>
+              <text class="cell">毛利润</text>
+              <text class="cell">单票毛利润</text>
+              <text class="cell">毛利率</text>
             </view>
             <view v-for="item in stats.channels" :key="item.name" class="table-row">
               <text class="cell cell-name">{{ item.name }}</text>
@@ -345,7 +350,7 @@
             <text class="section-kicker">06 / CUSTOMER</text>
             <text class="section-title">高价值客户</text>
           </view>
-          <text class="section-note">按可关联订单利润排序</text>
+          <text class="section-note">按可关联订单毛利润排序</text>
         </view>
         <scroll-view class="table-scroll" scroll-x>
           <view class="data-table customer-table">
@@ -354,8 +359,8 @@
               <text class="cell">票数</text>
               <text class="cell">活跃月</text>
               <text class="cell">收入</text>
-              <text class="cell">利润</text>
-              <text class="cell">利润率</text>
+              <text class="cell">毛利润</text>
+              <text class="cell">毛利率</text>
             </view>
             <view v-for="item in stats.top_customers" :key="item.name" class="table-row">
               <text class="cell cell-customer">{{ item.name }}</text>
@@ -429,9 +434,9 @@ const growthInsight = computed(() => {
     .filter((item: any) => Number(item.delta_profit) > 0)
     .sort((a: any, b: any) => Number(b.delta_profit) - Number(a.delta_profit))[0]
   const direction = Number(summary.profit_delta) >= 0 ? '增长' : '下降'
-  const mainDriver = Math.abs(Number(summary.volume_effect_pct)) >= Math.abs(Number(summary.unit_effect_pct)) ? '订单数量变化' : '单票利润变化'
+  const mainDriver = Math.abs(Number(summary.volume_effect_pct)) >= Math.abs(Number(summary.unit_effect_pct)) ? '订单数量变化' : '单票毛利润变化'
   const productText = positive ? `，其中“${positive.name}”贡献最突出` : ''
-  return `${growth.value.month} 利润环比${direction} ${percent(Math.abs(Number(summary.profit_change_pct) || 0))}，主要由${mainDriver}推动${productText}。`
+  return `${growth.value.month} 毛利润环比${direction} ${percent(Math.abs(Number(summary.profit_change_pct) || 0))}，主要由${mainDriver}推动${productText}。`
 })
 
 function formatInteger(value: any) {
@@ -623,6 +628,8 @@ onShow(loadStats)
 .query-button::after, .reset-button::after, .retry-button::after { border: 0; }
 
 .period-line { display: flex; justify-content: space-between; margin: 34rpx 4rpx 18rpx; font-size: 22rpx; color: #6e7771; }
+.cost-warning { display: flex; flex-wrap: wrap; gap: 8rpx 18rpx; margin: 0 0 20rpx; padding: 18rpx 22rpx; color: #7a4a16; background: #fff1d8; border: 1rpx solid #efc27d; font-size: 22rpx; }
+.cost-warning-title { font-weight: 700; }
 .record-count { font-weight: 700; color: var(--ink); }
 .metric-grid { display: flex; flex-wrap: wrap; gap: 18rpx; }
 .metric-card { width: calc(50% - 9rpx); min-height: 180rpx; padding: 28rpx; border-top: 5rpx solid var(--sage); background: var(--cream); box-sizing: border-box; box-shadow: 0 14rpx 30rpx rgba(37,42,35,.06); }

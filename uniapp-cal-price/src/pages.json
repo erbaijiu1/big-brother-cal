@@ -60,6 +60,14 @@
         {
           "path": "business_stats/detail",
           "style": { "navigationBarTitleText": "增长贡献明细" }
+        },
+        {
+          "path": "acquisition/index",
+          "style": { "navigationBarTitleText": "获客机会" }
+        },
+        {
+          "path": "acquisition/detail",
+          "style": { "navigationBarTitleText": "品类获客详情" }
         }
       ]
     }

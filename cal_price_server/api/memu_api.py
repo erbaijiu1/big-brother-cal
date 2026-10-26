@@ -21,6 +21,8 @@ BASE_MENUS: Dict[str, MenuItem] = {
                          path="/pages/admin/pricing_cal/index",  order=60, permission_less=1),
     "business_stats": MenuItem(title="经营统计", desc="订单、利润、客户与渠道分析",
                                path="/pages/admin/business_stats/index", order=70, permission_less=100),
+    "acquisition": MenuItem(title="获客机会", desc="判断哪些货品值得测试广告获客",
+                            path="/pages/admin/acquisition/index", order=80, permission_less=100),
 }
 
 

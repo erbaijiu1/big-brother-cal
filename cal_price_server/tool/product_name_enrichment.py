@@ -11,7 +11,6 @@ import argparse
 import csv
 import json
 import os
-import re
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -26,42 +25,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from db.sqlalchemy_define import get_session_factory
-
-
-PRODUCT_CATEGORIES = (
-    "冻品",
-    "熟食",
-    "水果",
-    "酒类",
-    "食品",
-    "生鲜肉类",
-    "水产海鲜",
-    "普货",
+from tool.product_category_normalizer import (
+    PRODUCT_CATEGORIES,
+    classify_with_rules,
+    is_non_product_description,
+    normalize_description,
+    resolve_product_category,
 )
-
-# Earlier rules win. Specific terms therefore precede broad terms such as
-# "冻" and "食品".
-PRODUCT_KEYWORD_RULES = (
-    ("酒类", ("茅台", "白酒", "红酒", "葡萄酒", "啤酒", "洋酒", "酒水")),
-    ("水产海鲜", ("水鱼", "大闸蟹", "螃蟹", "生蚝", "海鲜", "鱼苗", "鱼泡", "鱿鱼", "虾", "鲍鱼")),
-    ("生鲜肉类", ("牛肉", "羊肉", "猪肉", "鸡肉", "生鸡", "肉丸", "鹅肠", "鹅肝", "牛杂")),
-    ("熟食", ("熟冻", "熟食", "预制菜", "点心", "油条", "丸子", "饼皮", "熟的")),
-    ("食品", ("月饼", "果浆", "菠萝浆", "面粉", "大米", "干货", "食品", "果汁", "酱料", "茶叶", "酸奶", "鸡蛋", "粽子")),
-    ("水果", ("水果", "榴莲", "菠萝", "芒果", "柠檬", "百香果", "橙", "苹果", "梨", "西瓜")),
-    ("冻品", ("冻品", "生冻", "冷冻", "冰冻", "冻货", "雪糕")),
-    ("普货", ("屏幕", "家具", "沙发", "桌子", "柜子", "床垫", "电器", "冰箱", "空调", "纸巾", "包装盒", "杯子", "瓷砖", "油漆")),
-)
-
-NON_PRODUCT_DESCRIPTIONS = (
-    "正报",
-    "包车",
-    "在仓全部出",
-    "在仓的货全部出",
-    "在仓的全部出",
-    "到了才知道几件",
-)
-
-NON_PRODUCT_MARKERS = ("正报", "包车", "在仓")
 
 
 @dataclass(frozen=True)
@@ -80,24 +50,6 @@ class ProductResolution:
     confidence: float
 
 
-def normalize_description(value: object) -> str | None:
-    if value is None:
-        return None
-    normalized = re.sub(r"\s+", " ", str(value)).strip(" ,，。;；")
-    return normalized or None
-
-
-def is_non_product_description(description: str | None) -> bool:
-    normalized = normalize_description(description)
-    if not normalized or normalized in NON_PRODUCT_DESCRIPTIONS:
-        return True
-    if classify_with_rules(normalized):
-        return False
-    if any(marker in normalized for marker in NON_PRODUCT_MARKERS):
-        return True
-    return re.fullmatch(r"[\d\s+=.,，、/箱件板拖公斤kgKG]+", normalized) is not None
-
-
 def extract_consignment_description(raw_row_json: str | None) -> str | None:
     """Read the legacy description from the retained T0020142 raw row."""
     if not raw_row_json:
@@ -110,26 +62,22 @@ def extract_consignment_description(raw_row_json: str | None) -> str | None:
         return None
 
 
-def classify_with_rules(description: str | None) -> tuple[str, float] | None:
-    normalized = normalize_description(description)
-    if not normalized:
-        return None
-
-    lowered = normalized.lower()
-    for product_name, keywords in PRODUCT_KEYWORD_RULES:
-        if any(keyword.lower() in lowered for keyword in keywords):
-            return product_name, 1.0
-    return None
-
-
 class LlmProductClassifier:
     """Small OpenAI-compatible classifier used only after rules fail."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, timeout_seconds: float = 60):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        timeout_seconds: float = 60,
+        min_confidence: float = 0.90,
+    ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.min_confidence = min_confidence
 
     @classmethod
     def from_environment(cls) -> "LlmProductClassifier | None":
@@ -138,7 +86,9 @@ class LlmProductClassifier:
         model = os.getenv("LLM_MODEL", "").strip()
         if not (base_url and api_key and model):
             return None
-        return cls(base_url, api_key, model)
+        timeout_seconds = float(os.getenv("PRODUCT_CLASSIFIER_TIMEOUT_SECONDS", "60"))
+        min_confidence = float(os.getenv("PRODUCT_CLASSIFIER_MIN_CONFIDENCE", "0.90"))
+        return cls(base_url, api_key, model, timeout_seconds, min_confidence)
 
     def classify(self, descriptions: list[str]) -> dict[str, tuple[str, float]]:
         if not descriptions:
@@ -167,6 +117,7 @@ class LlmProductClassifier:
             json={
                 "model": self.model,
                 "temperature": 0,
+                "enable_thinking": False,
                 "response_format": {"type": "json_object"},
                 "messages": [
                     {"role": "system", "content": "你是谨慎的物流货物分类器。"},
@@ -186,7 +137,7 @@ class LlmProductClassifier:
             description = description_by_key.get(result.get("key"))
             product_name = result.get("product_name")
             confidence = float(result.get("confidence") or 0)
-            if description and product_name in PRODUCT_CATEGORIES and confidence >= 0.8:
+            if description and product_name in PRODUCT_CATEGORIES and confidence >= self.min_confidence:
                 classified[description] = (product_name, confidence)
         return classified
 
@@ -221,41 +172,77 @@ def resolve_product_names(
     candidates: Iterable[ProductCandidate],
     llm_classifier: LlmProductClassifier | None = None,
     llm_batch_size: int = 30,
+    cached_llm_results: dict[str, tuple[str, float]] | None = None,
+    min_confidence: float = 0.90,
 ) -> list[ProductResolution]:
     candidates = list(candidates)
     resolutions: list[ProductResolution] = []
     unresolved_by_description: dict[str, list[ProductCandidate]] = {}
 
     for candidate in candidates:
-        rule_result = classify_with_rules(candidate.description)
-        if rule_result and candidate.description:
-            product_name, confidence = rule_result
+        known_result = resolve_product_category(candidate.description)
+        if known_result and candidate.description:
             resolutions.append(
-                ProductResolution(candidate.performance_id, candidate.description, product_name, "rule", confidence)
+                ProductResolution(
+                    candidate.performance_id,
+                    candidate.description,
+                    known_result.category,
+                    known_result.source,
+                    known_result.confidence,
+                )
             )
             continue
         if candidate.description and not is_non_product_description(candidate.description):
             unresolved_by_description.setdefault(candidate.description, []).append(candidate)
 
+    for description, (product_name, confidence) in (cached_llm_results or {}).items():
+        matched_candidates = unresolved_by_description.pop(description, [])
+        for candidate in matched_candidates:
+            resolutions.append(
+                ProductResolution(candidate.performance_id, description, product_name, "llm", confidence)
+            )
+
     if llm_classifier is None:
         return resolutions
 
     descriptions = list(unresolved_by_description)
+    batch_count = (len(descriptions) + llm_batch_size - 1) // llm_batch_size
     for start in range(0, len(descriptions), llm_batch_size):
         batch = descriptions[start : start + llm_batch_size]
+        batch_number = start // llm_batch_size + 1
+        print(f"LLM 分类进度: {batch_number}/{batch_count}（{len(batch)} 条唯一描述）", flush=True)
         try:
             classified = llm_classifier.classify(batch)
         except (requests.RequestException, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             print(f"LLM 分类批次失败，保持未知: {exc}")
             continue
         for description, (product_name, confidence) in classified.items():
-            if product_name not in PRODUCT_CATEGORIES or confidence < 0.8:
+            if product_name not in PRODUCT_CATEGORIES or confidence < min_confidence:
                 continue
             for candidate in unresolved_by_description.get(description, []):
                 resolutions.append(
                     ProductResolution(candidate.performance_id, description, product_name, "llm", confidence)
                 )
     return resolutions
+
+
+def load_llm_results_from_preview(
+    preview_path: Path | None,
+    min_confidence: float = 0.90,
+) -> dict[str, tuple[str, float]]:
+    if preview_path is None or not preview_path.exists():
+        return {}
+
+    cached_results: dict[str, tuple[str, float]] = {}
+    with preview_path.open("r", encoding="utf-8-sig", newline="") as preview_file:
+        for row in csv.DictReader(preview_file):
+            if row.get("source") != "llm" or row.get("product_name") not in PRODUCT_CATEGORIES:
+                continue
+            confidence = float(row.get("confidence") or 0)
+            description = normalize_description(row.get("description"))
+            if description and confidence >= min_confidence:
+                cached_results[description] = (row["product_name"], confidence)
+    return cached_results
 
 
 def apply_product_resolutions(session, resolutions: Iterable[ProductResolution]) -> int:
@@ -292,11 +279,67 @@ def export_preview(resolutions: Iterable[ProductResolution], output_path: Path) 
             writer.writerow(item.__dict__)
 
 
+def enrich_blank_product_names(
+    *,
+    apply: bool = False,
+    disable_llm: bool = False,
+    llm_batch_size: int = 30,
+    reuse_preview: Path | None = None,
+    limit: int = 0,
+    output: Path | None = None,
+) -> dict[str, object]:
+    """Resolve blank product categories and optionally persist fill-only updates."""
+    output = output or (
+        Path(__file__).resolve().parent / "output" / "product_name_enrichment_preview.csv"
+    )
+    session = get_session_factory()()
+    try:
+        candidates = load_blank_product_candidates(session)
+        if limit > 0:
+            candidates = candidates[:limit]
+        llm_classifier = None if disable_llm else LlmProductClassifier.from_environment()
+        cached_llm_results = load_llm_results_from_preview(reuse_preview)
+        resolutions = resolve_product_names(
+            candidates,
+            llm_classifier,
+            max(1, llm_batch_size),
+            cached_llm_results,
+        )
+        export_preview(resolutions, output)
+
+        category_counts = Counter(item.product_name for item in resolutions)
+        source_counts = Counter(item.source for item in resolutions)
+        summary: dict[str, object] = {
+            "candidate_count": len(candidates),
+            "resolved_count": len(resolutions),
+            "unresolved_count": len(candidates) - len(resolutions),
+            "source_counts": dict(source_counts),
+            "category_counts": dict(category_counts),
+            "preview_file": str(output),
+            "apply": apply,
+            "updated_count": 0,
+        }
+
+        if not apply:
+            session.rollback()
+            return summary
+        updated_count = apply_product_resolutions(session, resolutions)
+        session.commit()
+        summary["updated_count"] = updated_count
+        return summary
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="补全经营分析中的未知产品")
     parser.add_argument("--apply", action="store_true", help="实际写回数据库；默认只预览")
     parser.add_argument("--disable-llm", action="store_true", help="仅使用确定性关键词规则")
     parser.add_argument("--llm-batch-size", type=int, default=30, help="每次发送给模型的唯一描述数")
+    parser.add_argument("--reuse-preview", type=Path, help="复用既有预览中的成功 LLM 分类，避免重复调用")
     parser.add_argument("--limit", type=int, default=0, help="只处理前 N 条；0 表示全部")
     parser.add_argument(
         "--output",
@@ -304,45 +347,17 @@ def main() -> None:
         default=Path(__file__).resolve().parent / "output" / "product_name_enrichment_preview.csv",
     )
     args = parser.parse_args()
-
-    session = get_session_factory()()
-    try:
-        candidates = load_blank_product_candidates(session)
-        if args.limit > 0:
-            candidates = candidates[: args.limit]
-        llm_classifier = None if args.disable_llm else LlmProductClassifier.from_environment()
-        resolutions = resolve_product_names(candidates, llm_classifier, max(1, args.llm_batch_size))
-        export_preview(resolutions, args.output)
-
-        category_counts = Counter(item.product_name for item in resolutions)
-        source_counts = Counter(item.source for item in resolutions)
-        print(
-            json.dumps(
-                {
-                    "candidate_count": len(candidates),
-                    "resolved_count": len(resolutions),
-                    "unresolved_count": len(candidates) - len(resolutions),
-                    "source_counts": source_counts,
-                    "category_counts": category_counts,
-                    "preview_file": str(args.output),
-                    "apply": args.apply,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
-
-        if not args.apply:
-            session.rollback()
-            return
-        updated_count = apply_product_resolutions(session, resolutions)
-        session.commit()
-        print(f"已补全 {updated_count} 条产品名称。")
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+    summary = enrich_blank_product_names(
+        apply=args.apply,
+        disable_llm=args.disable_llm,
+        llm_batch_size=args.llm_batch_size,
+        reuse_preview=args.reuse_preview,
+        limit=args.limit,
+        output=args.output,
+    )
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    if args.apply:
+        print(f"已补全 {summary['updated_count']} 条产品名称。")
 
 
 if __name__ == "__main__":

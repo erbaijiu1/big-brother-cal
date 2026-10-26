@@ -12,6 +12,7 @@ from api.for_inner.channel_info_api import router as channel_info_router
 from api.for_inner.customer_quote_api import router as customer_quote_router
 from api.memu_api import router as menu_router
 from api.business_stats_api import router as business_stats_router
+from api.acquisition_analytics_api import router as acquisition_analytics_router
 
 app = FastAPI()
 
@@ -30,6 +31,7 @@ app.include_router(channel_info_router, prefix="/cal_price")
 app.include_router(customer_quote_router, prefix="/cal_price")
 app.include_router(menu_router, prefix="/cal_price")
 app.include_router(business_stats_router, prefix="/cal_price")
+app.include_router(acquisition_analytics_router, prefix="/cal_price")
 
 
 app.add_middleware(

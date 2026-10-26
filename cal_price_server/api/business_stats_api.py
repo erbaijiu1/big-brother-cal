@@ -127,12 +127,27 @@ def get_business_overview(
                     COUNT(*) AS order_count,
                     ROUND(COALESCE(SUM(shipping_fee), 0), 2) AS total_shipping_fee,
                     ROUND(COALESCE(SUM(shipping_cost), 0), 2) AS total_shipping_cost,
-                    ROUND(COALESCE(SUM(actual_performance), 0), 2) AS total_profit,
-                    ROUND(COALESCE(AVG(actual_performance), 0), 2) AS avg_order_profit,
+                    ROUND(COALESCE(SUM(
+                        CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                            THEN NULL ELSE shipping_fee - shipping_cost END
+                    ), 0), 2) AS total_profit,
+                    ROUND(COALESCE(AVG(
+                        CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                            THEN NULL ELSE shipping_fee - shipping_cost END
+                    ), 0), 2) AS avg_order_profit,
                     ROUND(
-                        COALESCE(SUM(actual_performance) / NULLIF(SUM(shipping_fee), 0) * 100, 0),
+                        COALESCE(
+                            SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN NULL ELSE shipping_fee - shipping_cost END)
+                            / NULLIF(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN 0 ELSE shipping_fee END), 0) * 100,
+                            0
+                        ),
                         2
                     ) AS profit_rate_pct,
+                    SUM(shipping_fee > 0 AND shipping_cost = 0) AS missing_cost_order_count,
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN shipping_fee ELSE 0 END), 0), 2) AS missing_cost_shipping_fee,
                     ROUND(COALESCE(SUM(goods_weight), 0), 2) AS total_weight_kg,
                     ROUND(COALESCE(SUM(goods_volume), 0), 3) AS total_volume_cbm,
                     MIN(shipping_date) AS min_shipping_date,
@@ -169,8 +184,11 @@ def get_business_overview(
                     DATE_FORMAT(shipping_date, '%Y-%m') AS month,
                     COUNT(*) AS order_count,
                     ROUND(SUM(shipping_fee), 2) AS total_shipping_fee,
-                    ROUND(SUM(actual_performance), 2) AS total_profit,
-                    ROUND(AVG(actual_performance), 2) AS avg_order_profit
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS total_profit,
+                    ROUND(COALESCE(AVG(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS avg_order_profit,
+                    SUM(shipping_fee > 0 AND shipping_cost = 0) AS missing_cost_order_count
                 FROM t_performance_statement
                 {performance_filter}
                 GROUP BY DATE_FORMAT(shipping_date, '%Y-%m')
@@ -189,12 +207,21 @@ def get_business_overview(
                     COALESCE(NULLIF(TRIM(product_name), ''), '未知产品') AS name,
                     COUNT(*) AS order_count,
                     ROUND(SUM(shipping_fee), 2) AS total_shipping_fee,
-                    ROUND(SUM(actual_performance), 2) AS total_profit,
-                    ROUND(AVG(actual_performance), 2) AS avg_order_profit,
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS total_profit,
+                    ROUND(COALESCE(AVG(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS avg_order_profit,
                     ROUND(
-                        COALESCE(SUM(actual_performance) / NULLIF(SUM(shipping_fee), 0) * 100, 0),
+                        COALESCE(
+                            SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN NULL ELSE shipping_fee - shipping_cost END)
+                            / NULLIF(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN 0 ELSE shipping_fee END), 0) * 100,
+                            0
+                        ),
                         2
-                    ) AS profit_rate_pct
+                    ) AS profit_rate_pct,
+                    SUM(shipping_fee > 0 AND shipping_cost = 0) AS missing_cost_order_count
                 FROM t_performance_statement
                 {performance_filter}
                 GROUP BY COALESCE(NULLIF(TRIM(product_name), ''), '未知产品')
@@ -214,12 +241,21 @@ def get_business_overview(
                     COALESCE(NULLIF(TRIM(shipping_channel), ''), '未知渠道') AS name,
                     COUNT(*) AS order_count,
                     ROUND(SUM(shipping_fee), 2) AS total_shipping_fee,
-                    ROUND(SUM(actual_performance), 2) AS total_profit,
-                    ROUND(AVG(actual_performance), 2) AS avg_order_profit,
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS total_profit,
+                    ROUND(COALESCE(AVG(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS avg_order_profit,
                     ROUND(
-                        COALESCE(SUM(actual_performance) / NULLIF(SUM(shipping_fee), 0) * 100, 0),
+                        COALESCE(
+                            SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN NULL ELSE shipping_fee - shipping_cost END)
+                            / NULLIF(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN 0 ELSE shipping_fee END), 0) * 100,
+                            0
+                        ),
                         2
-                    ) AS profit_rate_pct
+                    ) AS profit_rate_pct,
+                    SUM(shipping_fee > 0 AND shipping_cost = 0) AS missing_cost_order_count
                 FROM t_performance_statement
                 {performance_filter}
                 GROUP BY COALESCE(NULLIF(TRIM(shipping_channel), ''), '未知渠道')
@@ -261,12 +297,21 @@ def get_business_overview(
                     ) AS sort_order,
                     COUNT(*) AS order_count,
                     ROUND(COUNT(*) / SUM(COUNT(*)) OVER () * 100, 2) AS order_pct,
-                    ROUND(SUM(actual_performance), 2) AS total_profit,
-                    ROUND(AVG(actual_performance), 2) AS avg_order_profit,
+                    ROUND(COALESCE(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS total_profit,
+                    ROUND(COALESCE(AVG(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                        THEN NULL ELSE shipping_fee - shipping_cost END), 0), 2) AS avg_order_profit,
                     ROUND(
-                        COALESCE(SUM(actual_performance) / NULLIF(SUM(shipping_fee), 0) * 100, 0),
+                        COALESCE(
+                            SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN NULL ELSE shipping_fee - shipping_cost END)
+                            / NULLIF(SUM(CASE WHEN shipping_fee > 0 AND shipping_cost = 0
+                                THEN 0 ELSE shipping_fee END), 0) * 100,
+                            0
+                        ),
                         2
-                    ) AS profit_rate_pct
+                    ) AS profit_rate_pct,
+                    SUM(shipping_fee > 0 AND shipping_cost = 0) AS missing_cost_order_count
                 FROM t_performance_statement
                 {performance_filter}
                 GROUP BY name
@@ -352,16 +397,33 @@ def get_business_overview(
                     COUNT(*) AS order_count,
                     COUNT(DISTINCT DATE_FORMAT(performance.shipping_date, '%Y-%m')) AS active_months,
                     ROUND(SUM(performance.shipping_fee), 2) AS total_shipping_fee,
-                    ROUND(SUM(performance.actual_performance), 2) AS total_profit,
-                    ROUND(AVG(performance.actual_performance), 2) AS avg_order_profit,
+                    ROUND(COALESCE(SUM(CASE
+                        WHEN performance.shipping_fee > 0 AND performance.shipping_cost = 0
+                            THEN NULL
+                        ELSE performance.shipping_fee - performance.shipping_cost
+                    END), 0), 2) AS total_profit,
+                    ROUND(COALESCE(AVG(CASE
+                        WHEN performance.shipping_fee > 0 AND performance.shipping_cost = 0
+                            THEN NULL
+                        ELSE performance.shipping_fee - performance.shipping_cost
+                    END), 0), 2) AS avg_order_profit,
                     ROUND(
                         COALESCE(
-                            SUM(performance.actual_performance)
-                            / NULLIF(SUM(performance.shipping_fee), 0) * 100,
+                            SUM(CASE
+                                WHEN performance.shipping_fee > 0 AND performance.shipping_cost = 0
+                                    THEN NULL
+                                ELSE performance.shipping_fee - performance.shipping_cost
+                            END)
+                            / NULLIF(SUM(CASE
+                                WHEN performance.shipping_fee > 0 AND performance.shipping_cost = 0
+                                    THEN 0 ELSE performance.shipping_fee
+                            END), 0) * 100,
                             0
                         ),
                         2
-                    ) AS profit_rate_pct
+                    ) AS profit_rate_pct,
+                    SUM(performance.shipping_fee > 0 AND performance.shipping_cost = 0)
+                        AS missing_cost_order_count
                 FROM t_performance_statement performance
                 JOIN customer_by_code
                     ON customer_by_code.shipping_code = performance.shipping_no
@@ -417,10 +479,28 @@ def get_monthly_growth(
                 SELECT
                     SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
                     SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
-                    ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0), 2) AS current_profit,
-                    ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0), 2) AS previous_profit,
-                    ROUND(COALESCE(AVG(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance END), 0), 2) AS current_avg_profit,
-                    ROUND(COALESCE(AVG(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance END), 0), 2) AS previous_avg_profit
+                    ROUND(COALESCE(SUM(CASE
+                        WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                            AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                        THEN shipping_fee - shipping_cost ELSE 0 END), 0), 2) AS current_profit,
+                    ROUND(COALESCE(SUM(CASE
+                        WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                            AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                        THEN shipping_fee - shipping_cost ELSE 0 END), 0), 2) AS previous_profit,
+                    ROUND(COALESCE(AVG(CASE
+                        WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                            AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                        THEN shipping_fee - shipping_cost END), 0), 2) AS current_avg_profit,
+                    ROUND(COALESCE(AVG(CASE
+                        WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                            AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                        THEN shipping_fee - shipping_cost END), 0), 2) AS previous_avg_profit,
+                    SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                        AND shipping_fee > 0 AND shipping_cost = 0 THEN 1 ELSE 0 END)
+                        AS current_missing_cost_orders,
+                    SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                        AND shipping_fee > 0 AND shipping_cost = 0 THEN 1 ELSE 0 END)
+                        AS previous_missing_cost_orders
                 FROM t_performance_statement
                 WHERE (shipping_date >= :current_start AND shipping_date < :current_end)
                    OR (shipping_date >= :previous_start AND shipping_date < :previous_end)
@@ -468,11 +548,19 @@ def get_monthly_growth(
                         {expression} AS name,
                         SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
                         SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
-                        ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0), 2) AS current_profit,
-                        ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0), 2) AS previous_profit,
+                        ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                            AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                            THEN shipping_fee - shipping_cost ELSE 0 END), 0), 2) AS current_profit,
+                        ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                            AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                            THEN shipping_fee - shipping_cost ELSE 0 END), 0), 2) AS previous_profit,
                         ROUND(
-                            COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0)
-                            - COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0),
+                            COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                                AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                                THEN shipping_fee - shipping_cost ELSE 0 END), 0)
+                            - COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                                AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                                THEN shipping_fee - shipping_cost ELSE 0 END), 0),
                             2
                         ) AS delta_profit
                     FROM t_performance_statement
@@ -506,8 +594,18 @@ def get_monthly_growth(
                         MIN(performance.shipping_date) AS first_shipping_date,
                         SUM(CASE WHEN performance.shipping_date >= :current_start AND performance.shipping_date < :current_end THEN 1 ELSE 0 END) AS current_orders,
                         SUM(CASE WHEN performance.shipping_date >= :previous_start AND performance.shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
-                        COALESCE(SUM(CASE WHEN performance.shipping_date >= :current_start AND performance.shipping_date < :current_end THEN performance.actual_performance ELSE 0 END), 0) AS current_profit,
-                        COALESCE(SUM(CASE WHEN performance.shipping_date >= :previous_start AND performance.shipping_date < :previous_end THEN performance.actual_performance ELSE 0 END), 0) AS previous_profit
+                        COALESCE(SUM(CASE
+                            WHEN performance.shipping_date >= :current_start
+                                AND performance.shipping_date < :current_end
+                                AND NOT (performance.shipping_fee > 0 AND performance.shipping_cost = 0)
+                            THEN performance.shipping_fee - performance.shipping_cost ELSE 0 END), 0)
+                            AS current_profit,
+                        COALESCE(SUM(CASE
+                            WHEN performance.shipping_date >= :previous_start
+                                AND performance.shipping_date < :previous_end
+                                AND NOT (performance.shipping_fee > 0 AND performance.shipping_cost = 0)
+                            THEN performance.shipping_fee - performance.shipping_cost ELSE 0 END), 0)
+                            AS previous_profit
                     FROM t_performance_statement performance
                     JOIN customer_by_code ON customer_by_code.shipping_code = performance.shipping_no
                     GROUP BY customer_by_code.customer
@@ -585,11 +683,19 @@ def get_growth_detail(
             SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN 1 ELSE 0 END) AS previous_orders,
             ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN shipping_fee ELSE 0 END), 0), 2) AS current_revenue,
             ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN shipping_fee ELSE 0 END), 0), 2) AS previous_revenue,
-            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0), 2) AS current_profit,
-            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0), 2) AS previous_profit,
+            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                THEN shipping_fee - shipping_cost ELSE 0 END), 0), 2) AS current_profit,
+            ROUND(COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                THEN shipping_fee - shipping_cost ELSE 0 END), 0), 2) AS previous_profit,
             ROUND(
-                COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN actual_performance ELSE 0 END), 0)
-                - COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end THEN actual_performance ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end
+                    AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                    THEN shipping_fee - shipping_cost ELSE 0 END), 0)
+                - COALESCE(SUM(CASE WHEN shipping_date >= :previous_start AND shipping_date < :previous_end
+                    AND NOT (shipping_fee > 0 AND shipping_cost = 0)
+                    THEN shipping_fee - shipping_cost ELSE 0 END), 0),
                 2
             ) AS delta_profit,
             SUM(CASE WHEN shipping_date >= :current_start AND shipping_date < :current_end THEN 1 ELSE 0 END)

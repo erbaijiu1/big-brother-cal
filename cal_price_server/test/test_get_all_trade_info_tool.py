@@ -156,7 +156,7 @@ class ImportTradeDataToolTest(unittest.TestCase):
         export_page_csv.assert_not_called()
         save_records.assert_called_once()
 
-    def test_performance_sync_keeps_existing_product_when_source_is_blank(self):
+    def test_performance_sync_only_fills_blank_existing_product(self):
         tool = load_tool(dataset_type="performance")
         session = SimpleNamespace(
             execute=Mock(),
@@ -169,5 +169,58 @@ class ImportTradeDataToolTest(unittest.TestCase):
             tool.save_performance_records_to_db([{"record_key": "one"}])
 
         statement = str(session.execute.call_args.args[0])
+        existing_position = statement.index("NULLIF(TRIM(product_name), '')")
+        incoming_position = statement.index("NULLIF(TRIM(VALUES(product_name)), '')")
+        self.assertLess(existing_position, incoming_position)
         self.assertIn("NULLIF(TRIM(VALUES(product_name)), '')", statement)
         session.commit.assert_called_once()
+
+    def test_performance_parser_normalizes_known_product_and_keeps_unknown_blank(self):
+        tool = load_tool(dataset_type="performance")
+        payload = {
+            "PageNo": 1,
+            "TableTitle": [
+                {"colID": 0, "FieldName": "公司单号"},
+                {"colID": 1, "FieldName": "货品名称"},
+            ],
+            "DataList": [
+                ["row-1", None, ["A1", "芒果"], {"Text": "A1"}, {"Text": "芒果"}],
+                ["row-2", None, ["A2", "生"], {"Text": "A2"}, {"Text": "生"}],
+            ],
+        }
+
+        records = tool.extract_performance_records(payload)
+
+        self.assertEqual(records[0]["product_name"], "水果")
+        self.assertIsNone(records[1]["product_name"])
+        self.assertIn('"货品名称": "芒果"', records[0]["row_text_json"])
+
+    def test_full_sync_runs_consignment_before_performance(self):
+        tool = load_tool()
+        completed = SimpleNamespace(returncode=0)
+
+        with patch.object(tool.subprocess, "run", return_value=completed) as run:
+            self.assertEqual(tool.run_all_datasets(), 0)
+
+        self.assertEqual(
+            [call.kwargs["env"]["DATASET_TYPE"] for call in run.call_args_list],
+            ["consignment", "performance"],
+        )
+        self.assertTrue(all(call.kwargs["env"]["SYNC_ALL_DATASETS"] == "0" for call in run.call_args_list))
+
+    def test_enrichment_runs_only_after_real_performance_sync(self):
+        tool = load_tool(dataset_type="performance")
+        with (
+            patch.object(tool, "DRY_RUN", False),
+            patch.object(tool, "AUTO_ENRICH_PRODUCT_NAMES", True),
+            patch.object(tool, "run_product_enrichment", return_value={"updated_count": 2}) as enrich,
+        ):
+            tool.maybe_enrich_product_names()
+        enrich.assert_called_once_with()
+
+        with (
+            patch.object(tool, "DRY_RUN", True),
+            patch.object(tool, "run_product_enrichment") as dry_run_enrich,
+        ):
+            tool.maybe_enrich_product_names()
+        dry_run_enrich.assert_not_called()

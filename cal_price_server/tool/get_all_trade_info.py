@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -17,6 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from db.sqlalchemy_define import get_session_factory
+from tool.product_category_normalizer import normalize_product_category
 
 
 # 旧系统连接信息。会话 Cookie 必须由运行环境注入，避免凭证进入代码仓库。
@@ -105,6 +107,10 @@ START_PAGE = max(1, int(os.getenv("START_PAGE", "1")))
 DRY_RUN = os.getenv("DRY_RUN", "1") == "1"
 EXPORT_CSV = os.getenv("EXPORT_CSV", "1" if DRY_RUN else "0") == "1"
 PRINT_RESPONSE = os.getenv("PRINT_RESPONSE", "0") == "1"
+SYNC_ALL_DATASETS = os.getenv("SYNC_ALL_DATASETS", "0") == "1"
+AUTO_ENRICH_PRODUCT_NAMES = os.getenv("AUTO_ENRICH_PRODUCT_NAMES", "1") == "1"
+PRODUCT_ENRICH_DISABLE_LLM = os.getenv("PRODUCT_ENRICH_DISABLE_LLM", "0") == "1"
+PRODUCT_ENRICH_LLM_BATCH_SIZE = max(1, int(os.getenv("PRODUCT_ENRICH_LLM_BATCH_SIZE", "30")))
 OUTPUT_DIR = Path(
     os.getenv("INGEST_OUTPUT_DIR", str(Path(__file__).resolve().parent / "output"))
 ).expanduser()
@@ -470,7 +476,9 @@ def extract_performance_records(parsed_json):
                 "salesman_payment_date": parse_date(row_map.get("业务员收款日期")),
                 "company_tracking_no": row_map.get("公司单号") or None,
                 "ship_to": row_map.get("送货地址") or row_map.get("收货单位") or None,
-                "product_name": row_map.get("货品名称") or row_map.get("产品名称") or None,
+                "product_name": normalize_product_category(
+                    row_map.get("货品名称") or row_map.get("产品名称")
+                ),
                 "goods_count": goods_count_val,
                 "goods_weight": parse_unit_number(row_map.get("货物重量") or row_map.get("重量(KG)")),
                 "goods_volume": parse_unit_number(row_map.get("货物体积") or row_map.get("体积(CBM)")),
@@ -601,8 +609,8 @@ def save_performance_records_to_db(records):
             company_tracking_no = VALUES(company_tracking_no),
             ship_to = VALUES(ship_to),
             product_name = COALESCE(
-                NULLIF(TRIM(VALUES(product_name)), ''),
-                product_name
+                NULLIF(TRIM(product_name), ''),
+                NULLIF(TRIM(VALUES(product_name)), '')
             ),
             goods_count = VALUES(goods_count),
             goods_weight = VALUES(goods_weight),
@@ -685,19 +693,19 @@ def run_paginated_ingest(start_page=1, max_pages=0, resume=True):
         raw_result = fetch_page(page_no)
         if not raw_result:
             print(f"第 {page_no} 页请求失败，停止自动翻页。")
-            break
+            return False
 
         parsed_data, warning = decode_json_str_response(raw_result)
         if warning:
             print(f"第 {page_no} 页解析提示: {warning}")
         if not isinstance(parsed_data, dict):
             print(f"第 {page_no} 页解析失败（非 JSON 对象），停止自动翻页。")
-            break
+            return False
 
         headers, _ = extract_csv_dataset(parsed_data)
         if not headers:
             print(f"第 {page_no} 页没有可导出的表头，停止自动翻页。")
-            break
+            return False
 
         if EXPORT_CSV:
             csv_path, csv_rows = export_page_csv(parsed_data)
@@ -745,6 +753,7 @@ def run_paginated_ingest(start_page=1, max_pages=0, resume=True):
             time.sleep(AUTO_INTERVAL_SECONDS)
 
     print(f"自动翻页结束，共处理 {processed_pages} 页，累计写入/更新 {total_saved} 条。")
+    return True
 
 
 def fetch_page(page_num=1):
@@ -788,18 +797,66 @@ def fetch_page(page_num=1):
     return None
 
 
-def main():
+def run_product_enrichment() -> dict[str, object]:
+    """Fill only blank performance categories after a successful real sync."""
+    from tool.product_name_enrichment import enrich_blank_product_names
+
+    preview_path = OUTPUT_DIR / "product_name_enrichment_preview.csv"
+    return enrich_blank_product_names(
+        apply=True,
+        disable_llm=PRODUCT_ENRICH_DISABLE_LLM,
+        llm_batch_size=PRODUCT_ENRICH_LLM_BATCH_SIZE,
+        reuse_preview=preview_path if preview_path.exists() else None,
+        output=preview_path,
+    )
+
+
+def run_all_datasets() -> int:
+    """Run consignment first, then performance; performance performs enrichment."""
+    child_environment = os.environ.copy()
+    child_environment["SYNC_ALL_DATASETS"] = "0"
+    # These overrides apply to only one legacy dataset and are unsafe to share.
+    child_environment.pop("LEGACY_DS_CODE", None)
+    child_environment.pop("LEGACY_GROUP_ID", None)
+    for dataset_type in ("consignment", "performance"):
+        child_environment["DATASET_TYPE"] = dataset_type
+        print(f"开始同步数据集: {dataset_type}", flush=True)
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve())],
+            env=child_environment.copy(),
+            check=False,
+        )
+        if completed.returncode != 0:
+            print(f"数据集 {dataset_type} 同步失败，停止后续步骤。")
+            return completed.returncode
+    return 0
+
+
+def maybe_enrich_product_names() -> None:
+    if DATASET_TYPE != "performance" or DRY_RUN or not AUTO_ENRICH_PRODUCT_NAMES:
+        return
+    summary = run_product_enrichment()
+    print("产品分类补全结果:")
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+
+def main() -> int:
+    if SYNC_ALL_DATASETS:
+        return run_all_datasets()
     if not PHPSESSID:
         print("缺少 PHPSESSID 环境变量，请先从旧系统登录会话中取得 Cookie。")
-        return
+        return 1
 
     if ENABLE_AUTO_PAGING:
-        run_paginated_ingest(
+        succeeded = run_paginated_ingest(
             start_page=START_PAGE,
             max_pages=AUTO_MAX_PAGES,
             resume=AUTO_RESUME,
         )
-        return
+        if not succeeded:
+            return 1
+        maybe_enrich_product_names()
+        return 0
 
     page_num = START_PAGE
     if DRY_RUN:
@@ -813,7 +870,7 @@ def main():
     result = fetch_page(page_num)
     if not result:
         print("没有获取到结果，请检查 Cookie、网络或请求参数。")
-        return
+        return 1
 
     if PRINT_RESPONSE:
         print("===== 格式化结果开始 =====")
@@ -825,12 +882,12 @@ def main():
         print(f"解析提示: {warning}")
     if not isinstance(parsed_data, dict):
         print("解码结果不是 JSON 对象，无法继续处理。")
-        return
+        return 1
 
     headers, _ = extract_csv_dataset(parsed_data)
     if not headers:
         print("未找到可用表头，无法继续处理。")
-        return
+        return 1
 
     if EXPORT_CSV:
         csv_path, row_count = export_page_csv(parsed_data)
@@ -845,7 +902,7 @@ def main():
 
     if DRY_RUN:
         print(f"DRY_RUN 检查完成：解析 {len(records)} 条，数据库未写入。")
-        return
+        return 0
 
     try:
         if DATASET_TYPE == "performance":
@@ -854,9 +911,12 @@ def main():
         else:
             saved_count = save_records_to_db(records)
             print(f"数据库写入完成: {saved_count} 条（按排单编号去重）")
+        maybe_enrich_product_names()
     except Exception as exc:
         print(f"数据库写入失败: {exc}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
