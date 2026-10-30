@@ -29,3 +29,4 @@ cal_price_server/api/for_inner/__pycache__/pricing_inner_api.cpython-310.pyc
 cal_price_server/tool/output/*
 !cal_price_server/tool/output/.gitkeep
 cal_price_server/**/__pycache__/
+cal_price_server/**/release_log/

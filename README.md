@@ -11,21 +11,30 @@ cd /Users/hc/Desktop/code/local_dev_env
 docker compose up -d cal_price_server
 ```
 
-管理前端是独立的 H5 开发服务，需要另外启动：
+管理前端默认使用已经构建好的 H5，由统一环境的 Nginx 直接托管，不需要长期启动 Vite。访问：
+
+- 登录页：<http://localhost/cal_static/#/pages/login/index>
+- 管理首页：<http://localhost/cal_static/#/pages/admin/index>
+- 计价规则：<http://localhost/cal_static/#/pages/admin/pricing_mgr/index>
+- 分类管理：<http://localhost/cal_static/#/pages/admin/classify_mgr/index>
+- 渠道管理：<http://localhost/cal_static/#/pages/admin/channel/index>
+- 渠道成本计算：<http://localhost/cal_static/#/pages/admin/pricing_cal/index>
+
+前端代码修改后重新构建：
+
+```bash
+cd /Users/hc/Desktop/code/toCom/big-brother-cal/uniapp-cal-price
+npm run build:h5
+```
+
+构建产物位于 `uniapp-cal-price/dist/build/h5`，该目录已挂载到统一 Nginx 的 `/cal_static/`。
+
+如需前端热更新调试，可临时启动 Vite：
 
 ```bash
 cd /Users/hc/Desktop/code/toCom/big-brother-cal/uniapp-cal-price
 npm run dev:h5 -- --host 0.0.0.0
 ```
-
-常用页面：
-
-- 登录页：<http://localhost:5173/cal_static/#/pages/login/index>
-- 管理首页：<http://localhost:5173/cal_static/#/pages/admin/index>
-- 计价规则：<http://localhost:5173/cal_static/#/pages/admin/pricing_mgr/index>
-- 分类管理：<http://localhost:5173/cal_static/#/pages/admin/classify_mgr/index>
-- 渠道管理：<http://localhost:5173/cal_static/#/pages/admin/channel/index>
-- 渠道成本计算：<http://localhost:5173/cal_static/#/pages/admin/pricing_cal/index>
 
 成本报价更新后重点检查：
 
