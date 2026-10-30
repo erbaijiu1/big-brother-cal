@@ -6,7 +6,7 @@ from api.goods_classify import router as classify_router
 from api.pricing_rule_api import router as pricing_rule_router
 from api.user_concact import router as contact_router
 from utils.logger_config import logger as logging
-from api import channel_mgr_api, goods_classify_mgr, pricing_rule_mgr_api, district_mgr, area_category_mgr, user_mgr, auth_router
+from api import channel_mgr_api, goods_classify_mgr, pricing_rule_mgr_api, district_mgr, area_category_mgr, user_mgr, auth_router, public_quote_api
 from api.for_inner.pricing_inner_api import router as inner_router
 from api.for_inner.channel_info_api import router as channel_info_router
 from api.for_inner.customer_quote_api import router as customer_quote_router
@@ -32,6 +32,7 @@ app.include_router(customer_quote_router, prefix="/cal_price")
 app.include_router(menu_router, prefix="/cal_price")
 app.include_router(business_stats_router, prefix="/cal_price")
 app.include_router(acquisition_analytics_router, prefix="/cal_price")
+app.include_router(public_quote_api.router, prefix="/cal_price")
 
 
 app.add_middleware(

@@ -30,7 +30,7 @@ npm run build:h5:public
 配置仅公开报价页使用的三个接口：
 
 - `POST /cal_price/classify/classify_list`
-- `GET /cal_price/districts/`
+- `GET /cal_price/public/districts`
 - `POST /cal_price/pricing_rule/min_pricing`
 
 其他 `/cal_price/` 管理接口会返回 404。

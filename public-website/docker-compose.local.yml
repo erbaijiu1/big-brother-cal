@@ -1,0 +1,16 @@
+services:
+  dage-website:
+    image: nginx:alpine
+    container_name: dage-website-local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4174:80"
+    volumes:
+      - ./:/usr/share/nginx/html:ro
+      - ./nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - local_dev_env_web
+
+networks:
+  local_dev_env_web:
+    external: true
