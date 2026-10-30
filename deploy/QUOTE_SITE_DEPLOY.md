@@ -8,8 +8,11 @@
 npm run build:h5:public
 ```
 
-输出目录为 `uniapp-cal-price/dist/build/h5/`。把该目录内的全部文件上传到线上
+输出目录为 `uniapp-cal-price/dist/build/h5-public/`。把该目录内的全部文件上传到线上
 `/var/www/hk-logistics-quote/`，不要额外套一层 `h5` 目录。
+
+官网构建和本地管理端构建使用不同输出目录，不会覆盖本地 Nginx 使用的
+`uniapp-cal-price/dist/build/h5/`。
 
 该构建按域名根目录 `/` 生成资源地址，页面会调用同域的 `/cal_price/...` 接口，
 因此不需要在前端写死服务器 IP 或域名，也不会产生跨域问题。
