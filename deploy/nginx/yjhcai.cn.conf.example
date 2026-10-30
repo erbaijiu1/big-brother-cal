@@ -1,0 +1,127 @@
+# 深圳市大哥物流有限公司官网生产 Nginx 模板
+# 发布目录：/var/www/yjhcai.cn/
+# 主站：https://www.yjhcai.cn/
+# 使用前确认 upstream、证书路径和静态目录。
+
+upstream yjhcai_cal_price_backend {
+    # Nginx 在宿主机、后端端口映射到宿主机时使用：
+    server 127.0.0.1:8088;
+
+    # Nginx 与后端在同一 Docker 网络时，删除上一行并使用：
+    # server cal_price_server:8088;
+
+    keepalive 16;
+}
+
+# HTTP 仅保留 ACME 验证，其余请求统一跳转到 www HTTPS。
+server {
+    listen 80;
+    listen [::]:80;
+    server_name yjhcai.cn www.yjhcai.cn;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type text/plain;
+    }
+
+    location / {
+        return 301 https://www.yjhcai.cn$request_uri;
+    }
+}
+
+# 裸域名 HTTPS 统一跳转到 www，避免出现两个官网来源。
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name yjhcai.cn;
+
+    ssl_certificate     /etc/letsencrypt/live/yjhcai.cn/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yjhcai.cn/privkey.pem;
+
+    return 301 https://www.yjhcai.cn$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name www.yjhcai.cn;
+
+    root /var/www/yjhcai.cn;
+    index index.html;
+    charset utf-8;
+    client_max_body_size 2m;
+
+    ssl_certificate     /etc/letsencrypt/live/yjhcai.cn/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yjhcai.cn/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" always;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 官网公开接口：只允许所需方法，并保持同域访问。
+    location = /cal_price/classify/classify_list {
+        limit_except POST { deny all; }
+        proxy_pass http://yjhcai_cal_price_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /cal_price/public/districts {
+        limit_except GET { deny all; }
+        proxy_pass http://yjhcai_cal_price_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /cal_price/pricing_rule/min_pricing {
+        limit_except POST { deny all; }
+        proxy_pass http://yjhcai_cal_price_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # 官网不暴露登录、计费管理等后台接口。
+    location /cal_price/ {
+        return 404;
+    }
+
+    # 防止本地部署配置被误发布后可被下载。
+    location ~* \.(?:ya?ml|conf)$ {
+        return 404;
+    }
+
+    location ~* \.(?:js|css|png|jpg|jpeg|gif|svg|ico|webp|woff2?)$ {
+        try_files $uri =404;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+}

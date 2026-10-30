@@ -1,4 +1,5 @@
-# 报价官网 Nginx 示例。
+# 旧版报价页 Nginx 示例，仅保留作历史参考。
+# 新的企业官网生产部署请使用同目录下 yjhcai.cn.conf.example，首页位于域名根路径 /。
 # 1. 确认域名证书路径和 upstream 地址。
 # 2. 将静态包内容解压到 /var/www/hk-logistics-quote/。
 # 3. 如果 Nginx 与后端同在 Docker 网络，将 127.0.0.1:8088 改为 cal_price_server:8088。
